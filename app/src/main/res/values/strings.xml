@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">他乡</string>
+    <string name="app_subtitle">虚拟定位仪</string>
+    <string name="notification_channel_name">定位模拟服务</string>
+    <string name="notification_channel_description">在后台维持虚拟定位与悬浮摇杆</string>
+    <string name="notification_stop">停止模拟</string>
+    <string name="notification_running_title">他乡正在改写坐标</string>
+    <string name="notification_running_body">纬度 %1$.6f · 经度 %2$.6f</string>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ink">#15221B</color>
+    <color name="paper">#F1EEE3</color>
+    <color name="paper_sheet">#FBF8EF</color>
+    <color name="signal_orange">#EC5A2E</color>
+    <color name="topo_line">#C9C4B4</color>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+</resources>

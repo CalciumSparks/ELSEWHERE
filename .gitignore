@@ -1,0 +1,34 @@
+*.iml
+.gradle
+.kotlin
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/build
+
+# Local release signing material; back it up separately.
+/release/
+*.jks
+*.keystore
+keystore.properties
+
+# Generated deliverables
+dist/*.apk
+dist/*.idsig
+
+# Local QA / build scratch
+/build-*.log
+/*.xml
+/*.log
+/*.txt
+/docs/screenshots/raw
+
+# Local tooling / sandbox diagnostics
+/.archify/
+/.archify-output/
+/archify-elsewhere/
