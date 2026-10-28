@@ -6,7 +6,8 @@
 - 包名：`com.elsewhere.location`
 - 平台：Android 8.0+（API 26+），targetSdk 35
 - 形态：单 APK，本地优先，无账号、无遥测、无 Root
-- 签名发行版：[`dist/elsewhere-1.0.0.apk`](dist/elsewhere-1.0.0.apk)
+- 仓库：[CalciumSparks/ELSEWHERE](https://github.com/CalciumSparks/ELSEWHERE)
+- 发行版：[GitHub Releases](https://github.com/CalciumSparks/ELSEWHERE/releases)
 - 设计记录：[docs/DESIGN.md](docs/DESIGN.md) · 验证记录：[docs/TESTING.md](docs/TESTING.md)
 
 ![他乡地图主界面](docs/screenshots/03-map.png)
@@ -92,13 +93,15 @@
 
 ## 安装
 
-### 直接安装发行版
+### 安装
+
+从 [GitHub Releases](https://github.com/CalciumSparks/ELSEWHERE/releases) 下载 APK 后：
 
 ```powershell
-adb install dist/elsewhere-1.0.0.apk
+adb install <downloaded>.apk
 ```
 
-首次打开会进入三步校准。
+当前源码仓库还没有发布第一个 Release；从源码构建时安装 `app/build/outputs/apk/debug/app-debug.apk`。首次打开会进入三步校准。
 
 ### 准备 Shizuku（推荐）
 
@@ -205,7 +208,7 @@ adb install dist/elsewhere-1.0.0.apk
 
 ### 其他说明
 
-- 更新检查不自动下载 APK；`wenyu/elsewhere` 是发布仓库占位，没发布 Release 时会显示「该仓库还没有发布 Release」。
+- 更新检查不自动下载 APK；默认读取 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE) 的公开 Release，没发布 Release 时会显示「该仓库还没有发布 Release」。发布入口见仓库 Releases。
 - 高德栅格底图与 Web 地理编码服务有各自的条款；应用不内置任何 API Key。
 - Photon 地理编码、OpenStreetMap 底图、GitHub API 均需要网络。
 - 真实 GPS 在室内可能只能得到缓存定位；界面会明确标出。
@@ -236,16 +239,20 @@ $env:ANDROID_SDK_ROOT='D:\Android\sdk'
 
 ### 发行版签名
 
-本地签名密钥位于 `release/elsewhere-release.jks`（已 gitignore）。口令和别名记录在 `release/README.md`，请自行备份；丢失后无法以更新方式覆盖已安装的发行版。
+签名密钥位于本地 `release/elsewhere-release.jks`，该目录和所有 `.jks` 已被 `.gitignore` 排除，不随仓库提交。口令与别名请放在密码管理器或本地 `release/README.md`；丢失密钥后无法以更新方式覆盖已安装的发行版。
+
+以下命令中的口令从环境变量读取，不要写进仓库：
 
 ```powershell
 $bt = 'D:\Android\sdk\build-tools\35.0.0'
+$env:ELSEWHERE_STORE_PASS = '<your-store-password>'
+$env:ELSEWHERE_KEY_PASS   = '<your-key-password>'
 & "$bt\zipalign.exe" -f -p 4 app\build\outputs\apk\release\app-release-unsigned.apk dist\elsewhere-1.0.0-aligned.apk
 & "$bt\apksigner.bat" sign `
   --ks release\elsewhere-release.jks `
   --ks-key-alias elsewhere `
-  --ks-pass 'pass:Elsewhere-Release-2026' `
-  --key-pass 'pass:Elsewhere-Release-2026' `
+  --ks-pass "pass:$env:ELSEWHERE_STORE_PASS" `
+  --key-pass "pass:$env:ELSEWHERE_KEY_PASS" `
   --out dist\elsewhere-1.0.0.apk dist\elsewhere-1.0.0-aligned.apk
 Remove-Item dist\elsewhere-1.0.0-aligned.apk
 & "$bt\apksigner.bat" verify --print-certs dist\elsewhere-1.0.0.apk
@@ -257,17 +264,17 @@ Remove-Item dist\elsewhere-1.0.0-aligned.apk
 27780366d4d1a041c0eb99b8b99bfafb9374de4d35af4ed840e422f2598349d0
 ```
 
-APK 校验和见 [`dist/SHA256SUMS.txt`](dist/SHA256SUMS.txt)。Debug 与 Release 签名不同，不能互相覆盖安装；切换时先卸载旧版。
+本地 APK 校验和可用 `Get-FileHash dist\elsewhere-1.0.0.apk -Algorithm SHA256` 生成。Debug 与 Release 签名不同，不能互相覆盖安装；切换时先卸载旧版。
 
 ### 更新仓库
 
 `gradle.properties`：
 
 ```properties
-ELSEWHERE_UPDATE_REPO=owner/repo
+ELSEWHERE_UPDATE_REPO=CalciumSparks/ELSEWHERE
 ```
 
-也可以在应用「系统与诊断 → GitHub 更新」中编辑仓库地址，点「检查 GitHub Release」后会保存。版本比较读取公开 Release 的 `tag_name`；无 Release 时给出空状态。应用只展示版本、更新说明和下载入口，不自动下载安装。
+也可以在应用「系统与诊断 → GitHub 更新」中编辑仓库地址，点「检查 GitHub Release」后会保存。版本比较读取公开 Release 的 `tag_name`；无 Release 时给出空状态。应用只展示版本、更新说明和下载入口，不自动下载安装。当前远端仓库尚未发布 Release，因此首次检查会返回「该仓库还没有发布 Release」；在 GitHub 上发布 Release 后即可正常显示版本。
 
 ---
 

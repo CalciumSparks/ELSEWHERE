@@ -19,6 +19,6 @@ All screenshots are from the Android 15 emulator (`elsewhere_api35`, 1080 × 240
 | `21-environment.png` | Drift, preset selection, Wi-Fi source enabled |
 | `22-environment-sources.png` | Radio fields and Location extras injection preview |
 | `26-route-overlay.png` | Auto route cruise overlay with ring progress |
-| `29-update-check.png` | GitHub Release check with the placeholder repository |
+| `29-update-check.png` | GitHub Release check against CalciumSparks/ELSEWHERE; no published Release yet |
 
 Screenshots are not retouched; only the device status bar is part of the capture. The route-cruise screenshot contains live injected coordinates produced by the app.

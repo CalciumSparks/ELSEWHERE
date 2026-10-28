@@ -164,9 +164,9 @@ cell_network_type=LTE
 
 ### 2.11 GitHub 更新检查
 
-- 默认仓库「wenyu/elsewhere」没有公开 Release，界面显示「该仓库还没有发布 Release。」，不崩溃。
+- 更新源已配置为 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE)；远端目前没有公开 Release，界面显示「该仓库还没有发布 Release。」，不崩溃。
 - 临时切换到有 Release 的公开仓库后，成功解析到 `13.6.0`、更新说明和下载按钮，说明网络、JSON、版本比较与状态渲染链路可用。
-- 发行版默认仓库仍为占位值，发布前请在 `gradle.properties` 或应用内改成实际仓库。
+- 在 GitHub 上创建首个 Release 后，默认更新源即可正常返回版本信息；发布产物可同时上传到该 Release。
 - 证据：[`29-update-check.png`](screenshots/29-update-check.png)。
 
 ---
