@@ -164,9 +164,10 @@ cell_network_type=LTE
 
 ### 2.11 GitHub 更新检查
 
-- 更新源已配置为 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE)；远端目前没有公开 Release，界面显示「该仓库还没有发布 Release。」，不崩溃。
-- 临时切换到有 Release 的公开仓库后，成功解析到 `13.6.0`、更新说明和下载按钮，说明网络、JSON、版本比较与状态渲染链路可用。
-- 在 GitHub 上创建首个 Release 后，默认更新源即可正常返回版本信息；发布产物可同时上传到该 Release。
+- 更新源已配置为 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE)，并已发布 `v1.0.0` Release（APK + SHA256SUMS 资产）。
+- 应用版本同为 `1.0.0`，检查返回 `tag_name=v1.0.0`、发布说明和 APK 资产，界面正确显示「已是最新」而不会误报更新。
+- 从 GitHub 下载的 Release APK SHA-256 与本地构建一致：`1d7e1f7a7fa15ac4be5a2dcbfef231434f20383c10d77807c2daa7c0dea256d5`。
+- 无 Release / 网络异常路径此前也已验证，分别显示空状态和错误信息，不崩溃。
 - 证据：[`29-update-check.png`](screenshots/29-update-check.png)。
 
 ---

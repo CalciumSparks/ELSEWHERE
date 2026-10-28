@@ -7,7 +7,7 @@
 - 平台：Android 8.0+（API 26+），targetSdk 35
 - 形态：单 APK，本地优先，无账号、无遥测、无 Root
 - 仓库：[CalciumSparks/ELSEWHERE](https://github.com/CalciumSparks/ELSEWHERE)
-- 发行版：[GitHub Releases](https://github.com/CalciumSparks/ELSEWHERE/releases)
+- 发行版：[v1.0.0](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0)
 - 设计记录：[docs/DESIGN.md](docs/DESIGN.md) · 验证记录：[docs/TESTING.md](docs/TESTING.md)
 
 ![他乡地图主界面](docs/screenshots/03-map.png)
@@ -95,13 +95,13 @@
 
 ### 安装
 
-从 [GitHub Releases](https://github.com/CalciumSparks/ELSEWHERE/releases) 下载 APK 后：
+从 [v1.0.0 Release](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0) 下载 `elsewhere-1.0.0.apk` 后：
 
 ```powershell
 adb install <downloaded>.apk
 ```
 
-当前源码仓库还没有发布第一个 Release；从源码构建时安装 `app/build/outputs/apk/debug/app-debug.apk`。首次打开会进入三步校准。
+发行版 v1.0.0 已发布。从源码构建时安装 `app/build/outputs/apk/debug/app-debug.apk`。首次打开会进入三步校准。
 
 ### 准备 Shizuku（推荐）
 
@@ -208,7 +208,7 @@ adb install <downloaded>.apk
 
 ### 其他说明
 
-- 更新检查不自动下载 APK；默认读取 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE) 的公开 Release，没发布 Release 时会显示「该仓库还没有发布 Release」。发布入口见仓库 Releases。
+- 更新检查不自动下载 APK；默认读取 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE) 的公开 Release。v1.0.0 已发布，当前应用版本相同，检查会显示「已是最新」并展示 Release 说明。
 - 高德栅格底图与 Web 地理编码服务有各自的条款；应用不内置任何 API Key。
 - Photon 地理编码、OpenStreetMap 底图、GitHub API 均需要网络。
 - 真实 GPS 在室内可能只能得到缓存定位；界面会明确标出。
@@ -274,7 +274,7 @@ Remove-Item dist\elsewhere-1.0.0-aligned.apk
 ELSEWHERE_UPDATE_REPO=CalciumSparks/ELSEWHERE
 ```
 
-也可以在应用「系统与诊断 → GitHub 更新」中编辑仓库地址，点「检查 GitHub Release」后会保存。版本比较读取公开 Release 的 `tag_name`；无 Release 时给出空状态。应用只展示版本、更新说明和下载入口，不自动下载安装。当前远端仓库尚未发布 Release，因此首次检查会返回「该仓库还没有发布 Release」；在 GitHub 上发布 Release 后即可正常显示版本。
+也可以在应用「系统与诊断 → GitHub 更新」中编辑仓库地址，点「检查 GitHub Release」后会保存。版本比较读取公开 Release 的 `tag_name`；无 Release 时给出空状态。应用只展示版本、更新说明和下载入口，不自动下载安装。当前 `v1.0.0` 已发布，应用版本相同，因此会显示「已是最新」；发布更高版本后会显示新版本卡片和下载入口。
 
 ---
 
