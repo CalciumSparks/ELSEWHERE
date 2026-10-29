@@ -1,6 +1,7 @@
 package com.elsewhere.location.data
 
 import android.content.Context
+import com.elsewhere.location.core.EnvironmentProfile
 import com.elsewhere.location.core.MotionMode
 import com.elsewhere.location.core.SensorConfig
 import com.elsewhere.location.shizuku.ShizukuManager
@@ -47,8 +48,9 @@ class XposedModuleRepository(
         mode: MotionMode,
         speedMps: Float,
         sensors: SensorConfig,
+        environment: EnvironmentProfile,
     ): String {
-        val json = configJson(mode, speedMps, sensors)
+        val json = configJson(mode, speedMps, sensors, environment)
         return "adb shell settings put global $CONFIG_KEY ${shellQuote(json)}"
     }
 
@@ -56,6 +58,7 @@ class XposedModuleRepository(
         mode: MotionMode,
         speedMps: Float,
         sensors: SensorConfig,
+        environment: EnvironmentProfile,
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!shizuku.status.value.ready) {
             return@withContext Result.failure(
@@ -64,7 +67,7 @@ class XposedModuleRepository(
                 ),
             )
         }
-        val json = configJson(mode, speedMps, sensors)
+        val json = configJson(mode, speedMps, sensors, environment)
         val result = shizuku.runShell(
             "settings put global $CONFIG_KEY ${shellQuote(json)}",
             timeoutMs = 10_000,
@@ -74,13 +77,14 @@ class XposedModuleRepository(
                 IllegalStateException(result.output.ifBlank { "写入 Xposed 模块配置失败。" }),
             )
         }
-        Result.success("Xposed 模块配置已写入；目标重启或下次 dispatch 后生效。")
+        Result.success("Xposed 模块配置已写入；传感器与无线环境在下次 dispatch / 系统 API 调用后生效。")
     }
 
     private fun configJson(
         mode: MotionMode,
         speedMps: Float,
         sensors: SensorConfig,
+        environment: EnvironmentProfile,
     ): String = JSONObject().apply {
         put("enabled", true)
         put("mode", mode.name)
@@ -95,6 +99,43 @@ class XposedModuleRepository(
                 put("linearAcceleration", sensors.linearAcceleration)
                 put("stepCounter", sensors.stepCounter)
                 put("stepDetector", sensors.stepDetector)
+            },
+        )
+        put(
+            "environment",
+            JSONObject().apply {
+                put(
+                    "wifi",
+                    JSONObject().apply {
+                        put("enabled", environment.wifi.enabled)
+                        put("ssid", environment.wifi.ssid)
+                        put("bssid", environment.wifi.bssid)
+                        put("rssi", environment.wifi.rssi)
+                        put("channel", environment.wifi.channel)
+                    },
+                )
+                put(
+                    "bluetooth",
+                    JSONObject().apply {
+                        put("enabled", environment.bluetooth.enabled)
+                        put("name", environment.bluetooth.name)
+                        put("address", environment.bluetooth.address)
+                        put("rssi", environment.bluetooth.rssi)
+                    },
+                )
+                put(
+                    "cell",
+                    JSONObject().apply {
+                        put("enabled", environment.cell.enabled)
+                        put("carrier", environment.cell.carrier)
+                        put("mcc", environment.cell.mcc)
+                        put("mnc", environment.cell.mnc)
+                        put("areaCode", environment.cell.areaCode)
+                        put("cellId", environment.cell.cellId)
+                        put("networkType", environment.cell.networkType)
+                        put("signalDbm", environment.cell.signalDbm)
+                    },
+                )
             },
         )
     }.toString()

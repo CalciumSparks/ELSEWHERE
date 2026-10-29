@@ -296,13 +296,13 @@ fun EnvironmentScreen(
                 english = "radio environment",
                 modifier = Modifier.padding(horizontal = 16.dp),
                 trailing = {
-                    Text("APP-SIDE EXTRAS", style = MonoTiny.copy(fontSize = 8.sp), color = Signal)
+                    Text("EXTRAS + XPOSED", style = MonoTiny.copy(fontSize = 8.sp), color = Signal)
                 },
             )
             Column(Modifier.padding(horizontal = 16.dp)) {
                 NoticeBlock(
-                    text = "这些字段会随 mock Location 的 extras 一起输出，但不会改变系统 Wi-Fi / 蓝牙 / 基站的扫描结果。第三方 App 仍可能读取真实无线电信息，界面不把它伪装成系统级注入。",
-                    title = "环境参数 / 非系统扫描修改",
+                    text = "这些字段会随 mock Location 的 extras 输出；安装 LSPatch / Xposed 模块后，还能改写目标进程的 Wi-Fi、蓝牙和蜂窝 Java API（连接字段、扫描结果、适配器身份、运营商与小区标识）。未 patch 的 App 仍可能读取真实系统值，模块只作用于被 patch / 虚拟化的目标进程。",
+                    title = "环境参数 / 两条投递路径",
                     tone = StatusTone.Warning,
                 )
                 Spacer(Modifier.height(10.dp))
@@ -563,7 +563,7 @@ fun EnvironmentScreen(
                     Column(Modifier.weight(1f)) {
                         Text("写入 Location extras", style = MaterialTheme.typography.titleMedium, color = Ink)
                         Text(
-                            "随测试位置一起提供 Wi-Fi / 蓝牙 / 基站字段。读取与否取决于目标应用。",
+                            "随测试位置提供 Wi-Fi / 蓝牙 / 基站字段；LSPatch 模块另走系统 API Hook，覆盖目标进程内的读取。",
                             style = MaterialTheme.typography.bodySmall,
                             color = Muted,
                         )
@@ -584,7 +584,7 @@ fun EnvironmentScreen(
                     SignalDot(Amber, 5.dp)
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "定位漂移是真实模拟；无线环境字段仅作为附加数据。",
+                        "定位漂移是真实模拟；无线字段可写入 Location extras，也可由 LSPatch 模块 Hook 目标进程。",
                         style = MonoTiny.copy(fontSize = 8.sp),
                         color = Muted,
                     )
@@ -801,6 +801,11 @@ private fun LSPatchXposedSection(
         ) {
             FridaStatusRow(label = "MODULE", value = "BUNDLED · XPOSED 82", color = Ink)
             FridaStatusRow(
+                label = "CHANNELS",
+                value = "SENSORS · WI-FI · BT · CELL",
+                color = Ink,
+            )
+            FridaStatusRow(
                 label = "ROUTE",
                 value = "LSPATCH / VIRTUALXPOSED",
                 color = Ink,
@@ -842,7 +847,7 @@ private fun LSPatchXposedSection(
         Text(
             "1. 安装导出的模块 APK。\n" +
                 "2. 用 LSPatch 选择目标 APK 并勾选本模块，patch 后安装；或把目标与模块都放进 VirtualXposed。\n" +
-                "3. 启动目标；模块默认 WALK/1.35 m/s/全部通道。用「写入当前配置」同步当前模式，或复制 ADB 命令。",
+                "3. 启动目标；模块默认 WALK/1.35 m/s/全部传感器，无线环境默认关闭。用「写入当前配置」同步运动与无线分组（Wi-Fi/蓝牙/基站），或复制 ADB 命令。",
             style = MaterialTheme.typography.bodySmall,
             color = Muted,
         )

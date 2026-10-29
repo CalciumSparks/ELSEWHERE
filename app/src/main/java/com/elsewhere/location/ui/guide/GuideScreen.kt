@@ -266,7 +266,12 @@ fun GuideScreen(
                 GuideStep(
                     "03",
                     "同步配置",
-                    "点「写入当前配置」通过 Shizuku 写全局配置，或复制 ADB 命令。模块默认 WALK/1.35 m/s/全部通道，每 2 秒重读。",
+                    "点「写入当前配置」通过 Shizuku 写全局配置，或复制 ADB 命令。模块默认 WALK/1.35 m/s/全部传感器，无线环境默认关闭；在环境页开启 Wi-Fi/蓝牙/基站分组后一并写入。模块每 2 秒重读。",
+                )
+                GuideStep(
+                    "04",
+                    "无线环境",
+                    "被 patch 的目标进程内，模块会改写 WifiInfo/ScanResult、BluetoothAdapter 与 TelephonyManager/CellIdentityLte 的常见读取；未 patch 的 App 仍可能读取真实系统值。",
                 )
                 Text(
                     "LSPatch 会改变目标签名；VirtualXposed 使用虚拟容器。两者都可能被完整性校验或 Xposed 检测发现。",

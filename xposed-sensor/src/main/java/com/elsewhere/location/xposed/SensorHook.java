@@ -2,17 +2,26 @@ package com.elsewhere.location.xposed;
 
 import android.app.AndroidAppHelper;
 import android.app.Application;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.hardware.Sensor;
+import android.net.wifi.WifiManager;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.telephony.TelephonyManager;
+import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
 
 import org.json.JSONObject;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -78,10 +87,285 @@ public final class SensorHook implements IXposedHookLoadPackage {
                 }
             });
 
+            installWirelessHooks(lpparam.classLoader);
             log("installed hooks for " + lpparam.packageName
                 + " process=" + lpparam.processName);
         } catch (Throwable error) {
             log("hook installation failed: " + error);
+        }
+    }
+
+    /**
+     * The same module carries the virtual radio environment. The target app's
+     * WiFiInfo / scan results / BluetoothAdapter / TelephonyManager reads are
+     * rewritten from the global config. Hooking the getters (instead of
+     * returning a fake system service) keeps the rest of the framework intact.
+     */
+    private static void installWirelessHooks(ClassLoader classLoader) {
+        // Wi-Fi connection fields.
+        hookResult(classLoader, "android.net.wifi.WifiInfo", "getSSID",
+            c -> c.environment.wifi.enabled,
+            c -> quote(c.environment.wifi.ssid));
+        hookResult(classLoader, "android.net.wifi.WifiInfo", "getBSSID",
+            c -> c.environment.wifi.enabled,
+            c -> c.environment.wifi.bssid);
+        hookResult(classLoader, "android.net.wifi.WifiInfo", "getMacAddress",
+            c -> c.environment.wifi.enabled,
+            c -> c.environment.wifi.bssid);
+        hookResult(classLoader, "android.net.wifi.WifiInfo", "getRssi",
+            c -> c.environment.wifi.enabled,
+            c -> c.environment.wifi.rssi);
+        hookResult(classLoader, "android.net.wifi.WifiInfo", "getFrequency",
+            c -> c.environment.wifi.enabled,
+            c -> frequencyFromChannel(c.environment.wifi.channel));
+        hookResult(classLoader, "android.net.wifi.WifiInfo", "getLinkSpeed",
+            c -> c.environment.wifi.enabled,
+            c -> 866);
+        hookResult(classLoader, "android.net.wifi.WifiInfo", "getNetworkId",
+            c -> c.environment.wifi.enabled,
+            c -> 1);
+
+        // Wi-Fi state + one synthetic scan result.
+        hookResult(classLoader, "android.net.wifi.WifiManager", "isWifiEnabled",
+            c -> c.environment.wifi.enabled,
+            c -> Boolean.TRUE);
+        hookResult(classLoader, "android.net.wifi.WifiManager", "getWifiState",
+            c -> c.environment.wifi.enabled,
+            c -> WifiManager.WIFI_STATE_ENABLED);
+        hookResult(classLoader, "android.net.wifi.WifiManager", "getScanResults",
+            c -> c.environment.wifi.enabled,
+            SensorHook::fakeScanResults);
+
+        // Bluetooth adapter identity/state.
+        hookResult(classLoader, "android.bluetooth.BluetoothAdapter", "getName",
+            c -> c.environment.bluetooth.enabled,
+            c -> c.environment.bluetooth.name);
+        hookResult(classLoader, "android.bluetooth.BluetoothAdapter", "getAddress",
+            c -> c.environment.bluetooth.enabled,
+            c -> c.environment.bluetooth.address);
+        hookResult(classLoader, "android.bluetooth.BluetoothAdapter", "isEnabled",
+            c -> c.environment.bluetooth.enabled,
+            c -> Boolean.TRUE);
+        hookResult(classLoader, "android.bluetooth.BluetoothAdapter", "getState",
+            c -> c.environment.bluetooth.enabled,
+            c -> BluetoothAdapter.STATE_ON);
+
+        // Cell operator and legacy cell identity. getAllCellInfo is handled
+        // best-effort with a reflected CellInfoLte; see fakeCellInfoList().
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getNetworkOperator",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.mcc + c.environment.cell.mnc);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getSimOperator",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.mcc + c.environment.cell.mnc);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getNetworkOperatorName",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.carrier);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getSimOperatorName",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.carrier);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getNetworkType",
+            c -> c.environment.cell.enabled,
+            SensorHook::networkTypeInt);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getDataNetworkType",
+            c -> c.environment.cell.enabled,
+            SensorHook::networkTypeInt);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getPhoneType",
+            c -> c.environment.cell.enabled,
+            c -> TelephonyManager.PHONE_TYPE_GSM);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getSimState",
+            c -> c.environment.cell.enabled,
+            c -> TelephonyManager.SIM_STATE_READY);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getCellLocation",
+            c -> c.environment.cell.enabled,
+            SensorHook::fakeCellLocation);
+        hookResult(classLoader, "android.telephony.TelephonyManager", "getAllCellInfo",
+            c -> c.environment.cell.enabled,
+            SensorHook::fakeCellInfoList);
+
+        // Android 15 keeps some CellIdentityLte fields hidden; spoofing the
+        // public getters is version-proof and also fixes the synthetic object
+        // when its private fields cannot be written.
+        hookResult(classLoader, "android.telephony.CellIdentityLte", "getMcc",
+            c -> c.environment.cell.enabled,
+            c -> parseInt(c.environment.cell.mcc, 460));
+        hookResult(classLoader, "android.telephony.CellIdentityLte", "getMnc",
+            c -> c.environment.cell.enabled,
+            c -> parseInt(c.environment.cell.mnc, 0));
+        hookResult(classLoader, "android.telephony.CellIdentityLte", "getCi",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.cellId);
+        hookResult(classLoader, "android.telephony.CellIdentityLte", "getTac",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.areaCode);
+        hookResult(classLoader, "android.telephony.CellIdentityLte", "getMccString",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.mcc);
+        hookResult(classLoader, "android.telephony.CellIdentityLte", "getMncString",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.mnc);
+        hookResult(classLoader, "android.telephony.CellIdentityLte", "getMobileNetworkOperator",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.mcc + c.environment.cell.mnc);
+        hookResult(classLoader, "android.telephony.CellSignalStrengthLte", "getRsrp",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.signalDbm);
+        hookResult(classLoader, "android.telephony.CellSignalStrengthLte", "getDbm",
+            c -> c.environment.cell.enabled,
+            c -> c.environment.cell.signalDbm);
+        hookResult(classLoader, "android.telephony.CellSignalStrengthLte", "getLevel",
+            c -> c.environment.cell.enabled,
+            c -> 2);
+    }
+
+    private static void hookResult(
+        ClassLoader classLoader,
+        String className,
+        String methodName,
+        Predicate<Config> enabled,
+        Function<Config, Object> value
+    ) {
+        try {
+            Class<?> type = Class.forName(className, false, classLoader);
+            XposedBridge.hookAllMethods(type, methodName, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        Config current = currentConfig();
+                        if (enabled.test(current)) {
+                            param.setResult(value.apply(current));
+                        }
+                    } catch (Throwable error) {
+                        log("wireless hook " + methodName + " failed: " + error);
+                    }
+                }
+            });
+        } catch (Throwable error) {
+            log("wireless hook skipped " + className + "." + methodName + ": " + error);
+        }
+    }
+
+    private static String quote(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    private static int frequencyFromChannel(int channel) {
+        if (channel == 14) return 2484;
+        if (channel >= 1 && channel <= 13) return 2407 + channel * 5;
+        if (channel >= 32 && channel <= 177) return 5000 + channel * 5;
+        return 5745;
+    }
+
+    private static List<?> fakeScanResults(Config c) {
+        try {
+            Class<?> scanResultType = Class.forName("android.net.wifi.ScanResult", false, Config.class.getClassLoader());
+            Constructor<?> constructor = scanResultType.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            Object scan = constructor.newInstance();
+            setField(scanResultType, scan, "SSID", c.environment.wifi.ssid);
+            setField(scanResultType, scan, "BSSID", c.environment.wifi.bssid);
+            setField(scanResultType, scan, "capabilities", "[WPA2-PSK-CCMP][ESS]");
+            setField(scanResultType, scan, "level", c.environment.wifi.rssi);
+            setField(scanResultType, scan, "frequency", frequencyFromChannel(c.environment.wifi.channel));
+            return Collections.singletonList(scan);
+        } catch (Throwable error) {
+            log("fake ScanResult unavailable: " + error);
+            return Collections.emptyList();
+        }
+    }
+
+    private static Object fakeCellLocation(Config c) {
+        try {
+            GsmCellLocation location = new GsmCellLocation();
+            location.setLacAndCid(c.environment.cell.areaCode, c.environment.cell.cellId);
+            return location;
+        } catch (Throwable error) {
+            log("fake GsmCellLocation failed: " + error);
+            return null;
+        }
+    }
+
+    private static List<?> fakeCellInfoList(Config c) {
+        try {
+            ClassLoader loader = Config.class.getClassLoader();
+            Object cell = newHidden("android.telephony.CellInfoLte", loader);
+            Object identity = newHidden("android.telephony.CellIdentityLte", loader);
+            Object signal = newHidden("android.telephony.CellSignalStrengthLte", loader);
+            if (cell == null || identity == null || signal == null) return Collections.emptyList();
+
+            Class<?> identityType = identity.getClass();
+            // mcc/mnc are spoofed through CellIdentityLte getters; their
+            // private field names differ across Android releases.
+            setField(identityType, identity, "mCi", c.environment.cell.cellId);
+            setField(identityType, identity, "mTac", c.environment.cell.areaCode);
+
+            Class<?> signalType = signal.getClass();
+            setField(signalType, signal, "mRsrp", c.environment.cell.signalDbm);
+            setField(signalType, signal, "mRssi", c.environment.cell.signalDbm + 20);
+            setField(signalType, signal, "mLevel", 2);
+
+            Class<?> cellType = cell.getClass();
+            setField(cellType, cell, "mCellIdentityLte", identity);
+            setField(cellType, cell, "mCellSignalStrengthLte", signal);
+            return Collections.singletonList(cell);
+        } catch (Throwable error) {
+            log("fake CellInfo unavailable: " + error);
+            return Collections.emptyList();
+        }
+    }
+
+    private static Object newHidden(String className, ClassLoader loader) {
+        try {
+            Class<?> type = Class.forName(className, false, loader);
+            Constructor<?> constructor = type.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (Throwable error) {
+            log("hidden constructor unavailable " + className + ": " + error);
+            return null;
+        }
+    }
+
+    private static void setField(Class<?> type, Object target, String name, Object value) {
+        try {
+            Field field = type.getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (Throwable error) {
+            log("field unavailable " + type.getSimpleName() + "." + name + ": " + error);
+        }
+    }
+
+    private static int parseInt(String value, int fallback) {
+        try {
+            return Integer.parseInt(value);
+        } catch (Throwable ignored) {
+            return fallback;
+        }
+    }
+
+    private static int networkTypeInt(Config c) {
+        String type = c.environment.cell.networkType == null
+            ? "LTE"
+            : c.environment.cell.networkType.toUpperCase();
+        switch (type) {
+            case "NR":
+            case "5G":
+                return 20;
+            case "HSPAP":
+                return 15;
+            case "UMTS":
+            case "3G":
+                return 3;
+            case "EDGE":
+                return 2;
+            case "GSM":
+                return 1;
+            case "CDMA":
+                return 4;
+            case "LTE":
+            default:
+                return 13;
         }
     }
 
@@ -275,6 +559,7 @@ public final class SensorHook implements IXposedHookLoadPackage {
         final boolean linearAcceleration;
         final boolean stepCounter;
         final boolean stepDetector;
+        final Environment environment;
 
         Config(
             boolean enabled,
@@ -286,7 +571,8 @@ public final class SensorHook implements IXposedHookLoadPackage {
             boolean gravity,
             boolean linearAcceleration,
             boolean stepCounter,
-            boolean stepDetector
+            boolean stepDetector,
+            Environment environment
         ) {
             this.enabled = enabled;
             this.mode = mode;
@@ -298,12 +584,14 @@ public final class SensorHook implements IXposedHookLoadPackage {
             this.linearAcceleration = linearAcceleration;
             this.stepCounter = stepCounter;
             this.stepDetector = stepDetector;
+            this.environment = environment;
         }
 
         static Config defaults() {
             return new Config(
                 true, "WALK", 1.35, 1.0,
-                true, true, true, true, true, true
+                true, true, true, true, true, true,
+                Environment.defaults()
             );
         }
 
@@ -321,7 +609,8 @@ public final class SensorHook implements IXposedHookLoadPackage {
                     sensor(sensors, "gravity"),
                     sensor(sensors, "linearAcceleration"),
                     sensor(sensors, "stepCounter"),
-                    sensor(sensors, "stepDetector")
+                    sensor(sensors, "stepDetector"),
+                    Environment.parse(root.optJSONObject("environment"))
                 );
             } catch (Throwable error) {
                 log("invalid config; using defaults: " + error);
@@ -331,6 +620,143 @@ public final class SensorHook implements IXposedHookLoadPackage {
 
         private static boolean sensor(JSONObject object, String key) {
             return object == null || object.optBoolean(key, true);
+        }
+    }
+
+    private static final class Environment {
+        final Wifi wifi;
+        final Bluetooth bluetooth;
+        final Cell cell;
+
+        Environment(Wifi wifi, Bluetooth bluetooth, Cell cell) {
+            this.wifi = wifi;
+            this.bluetooth = bluetooth;
+            this.cell = cell;
+        }
+
+        static Environment defaults() {
+            return new Environment(
+                Wifi.defaults(),
+                Bluetooth.defaults(),
+                Cell.defaults()
+            );
+        }
+
+        static Environment parse(JSONObject object) {
+            if (object == null) return defaults();
+            return new Environment(
+                Wifi.parse(object.optJSONObject("wifi")),
+                Bluetooth.parse(object.optJSONObject("bluetooth")),
+                Cell.parse(object.optJSONObject("cell"))
+            );
+        }
+    }
+
+    private static final class Wifi {
+        final boolean enabled;
+        final String ssid;
+        final String bssid;
+        final int rssi;
+        final int channel;
+
+        Wifi(boolean enabled, String ssid, String bssid, int rssi, int channel) {
+            this.enabled = enabled;
+            this.ssid = ssid;
+            this.bssid = bssid;
+            this.rssi = rssi;
+            this.channel = channel;
+        }
+
+        static Wifi defaults() {
+            return new Wifi(false, "SEVEN-ELEVEN-5G", "A4:2B:8C:19:7D:02", -57, 149);
+        }
+
+        static Wifi parse(JSONObject object) {
+            if (object == null) return defaults();
+            return new Wifi(
+                object.optBoolean("enabled", false),
+                object.optString("ssid", "SEVEN-ELEVEN-5G"),
+                object.optString("bssid", "A4:2B:8C:19:7D:02"),
+                object.optInt("rssi", -57),
+                object.optInt("channel", 149)
+            );
+        }
+    }
+
+    private static final class Bluetooth {
+        final boolean enabled;
+        final String name;
+        final String address;
+        final int rssi;
+
+        Bluetooth(boolean enabled, String name, String address, int rssi) {
+            this.enabled = enabled;
+            this.name = name;
+            this.address = address;
+            this.rssi = rssi;
+        }
+
+        static Bluetooth defaults() {
+            return new Bluetooth(false, "AirPods Pro", "3C:2A:4F:81:9B:20", -62);
+        }
+
+        static Bluetooth parse(JSONObject object) {
+            if (object == null) return defaults();
+            return new Bluetooth(
+                object.optBoolean("enabled", false),
+                object.optString("name", "AirPods Pro"),
+                object.optString("address", "3C:2A:4F:81:9B:20"),
+                object.optInt("rssi", -62)
+            );
+        }
+    }
+
+    private static final class Cell {
+        final boolean enabled;
+        final String carrier;
+        final String mcc;
+        final String mnc;
+        final int areaCode;
+        final int cellId;
+        final String networkType;
+        final int signalDbm;
+
+        Cell(
+            boolean enabled,
+            String carrier,
+            String mcc,
+            String mnc,
+            int areaCode,
+            int cellId,
+            String networkType,
+            int signalDbm
+        ) {
+            this.enabled = enabled;
+            this.carrier = carrier;
+            this.mcc = mcc;
+            this.mnc = mnc;
+            this.areaCode = areaCode;
+            this.cellId = cellId;
+            this.networkType = networkType;
+            this.signalDbm = signalDbm;
+        }
+
+        static Cell defaults() {
+            return new Cell(false, "中国移动", "460", "00", 21987, 3735921, "LTE", -91);
+        }
+
+        static Cell parse(JSONObject object) {
+            if (object == null) return defaults();
+            return new Cell(
+                object.optBoolean("enabled", false),
+                object.optString("carrier", "中国移动"),
+                object.optString("mcc", "460"),
+                object.optString("mnc", "00"),
+                object.optInt("areaCode", 21987),
+                object.optInt("cellId", 3735921),
+                object.optString("networkType", "LTE"),
+                object.optInt("signalDbm", -91)
+            );
         }
     }
 }

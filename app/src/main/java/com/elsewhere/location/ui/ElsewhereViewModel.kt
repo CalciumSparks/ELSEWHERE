@@ -1190,6 +1190,7 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
             mode = current.motionMode,
             speedMps = current.speeds.forMode(current.motionMode),
             sensors = current.sensors,
+            environment = current.environment,
         )
     }
 
@@ -1228,6 +1229,7 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
                 mode = current.motionMode,
                 speedMps = current.speeds.forMode(current.motionMode),
                 sensors = current.sensors,
+                environment = current.environment,
             ).onSuccess { message ->
                 _xposedUi.update {
                     it.copy(
