@@ -229,13 +229,15 @@
 Frida 是一个**外部注入**能力，界面不能把它画成普通的“已开启传感器注入”。因此：
 
 - 区块标题带 `EXTERNAL INJECTION`；
-- 先放琥珀色边界说明，再放目标包名和生成按钮；
-- Shizuku / SU / Frida Server 三个状态分开显示；
+- 先放琥珀色边界说明，再放注入路径选择（JDWP / Root / Gadget）、目标包名和生成按钮；
+- 状态区把 `TARGET`（是否 debuggable）、`JDWP`、Shizuku、SU、Frida Server 分开显示；
 - 生成结果面板明确写 `FRIDA SCRIPT / READY`，而不是 `HOOK ACTIVE`；
-- 说明 Shizuku 没有 ptrace 权限，外部 Frida 客户端才是执行者。
+- 说明 Shizuku 没有 ptrace 权限；JDWP 免 Root 只对 debuggable 目标有效，外部 loader 才是执行者。
 
-这是把“诚实边界”延伸到新功能：可以做脚本生成、部署和命令导出，但不能把“脚本已生成”写成“Hook 已生效”。
+LSPatch / VirtualXposed 只在说明文字中出现，表示“需要 patch/虚拟空间 + Xposed 模块”的另一类路线；当前不把它们画成已实现能力。
+
+这是把“诚实边界”延伸到新功能：可以做脚本生成、目标检测、部署和命令导出，但不能把“脚本已生成”写成“Hook 已生效”。
 
 ### 架构图
 
-采用 Archify 原生 architecture 版式，明确画出两条不同信任级的路径：无 Root 的定位链路，和 Root / Gadget 的 Frida 注入环境。架构图在 README 中以静态 PNG 呈现，同时保留可交互 HTML。
+采用 Archify 原生 architecture 版式，明确画出不同信任级的路径：无 Root 的定位链路，以及外部 Frida 运行时的 JDWP（debuggable）、Root frida-server 和 Gadget 三条注入链。架构图在 README 中以静态 PNG 呈现，同时保留可交互 HTML。

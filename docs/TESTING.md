@@ -181,15 +181,19 @@ cell_network_type=LTE
 
 ### 2.13 Frida Sensor Bridge
 
-- 环境页提供目标包名、Shizuku / su / frida-server 检测、当前模式/通道展示。
-- 输入 `com.android.chrome` 生成脚本；文件可被 `adb pull` 读取，大小 9,276 B，配置中的 target/mode/sensors 正确，`node --check` 通过。
-- 应用在没有 Shizuku 时正确显示「脚本只保存在应用外部目录」，没有伪报注入成功。
-- **未执行真实 Frida 运行时注入**：QA 环境没有安装 host Frida 客户端和对应 frida-server；脚本的 dispatch 行为需在 Root / Gadget 环境验证。这是本功能的主要残余风险。
+- 环境页提供三种注入路径：JDWP（免 Root）、Root frida-server、Frida Gadget；目标包名、Shizuku / su / frida-server 检测、当前模式/通道展示。
+- 输入 `com.android.chrome` 后「检测环境」显示 `TARGET: NOT DEBUGGABLE`、`JDWP: NO`，并出现 JDWP 不适用提示。
+- 输入 debuggable 的 `com.elsewhere.location` 后显示 `TARGET: DEBUGGABLE`、`JDWP: AVAILABLE`；生成 JDWP 脚本，命令包含 `frida-jdwp-loader.py frida -n ... -i script -l ...`。
+- 脚本可由 `adb pull` 读取，配置 target/mode/sensors 正确，`node --check` 通过。
+- **真实 JDWP 注入验证成功**：在 Android 15 x86_64 模拟器上使用 `frida-jdwp-loader` + Frida Gadget 17.24.3；loader 完成 JDWP handshake、`set-debug-app`、Gadget 上传和 `Runtime.load`，输出 `Library injection successful!`，目标重启后正常运行。全程**无 Root、无 APK 重打包**。
+- Windows 主机上 loader 的包名校验因 CRLF 报 `Invalid package name`；本地 QA 用 `.strip()` 修复后通过。这是第三方工具的 bug，已写入 Frida 文档。
+- QA 目标 `com.elsewhere.location` 没有注册系统 `SensorManager` 监听，因此没有观察到传感器事件；`ELSEWHERE-SENSOR` logcat 也没有 ready/事件输出。传感器 dispatch 行为仍需真正使用传感器的目标 App 联调。Root/Gadget 路径未做真实设备矩阵测试。
 - 实现与操作说明见 [`FRIDA_SENSOR_BRIDGE.md`](FRIDA_SENSOR_BRIDGE.md)。
 
 ### 2.14 Archify 架构图
 
-- 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `ff70aa9770ec7e9a4df93f95a602d0cc386ea78f`。
+- 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `ad891b93fa808c32b4c4f129e7d61a793e4bf471`。
+- 架构图包含 JDWP loader、Root frida-server、Gadget 三条注入路径，以及 LSPatch / VirtualXposed 仅文档说明的边界。
 - 最终 `finalize`：validate / deliver / check / browser-check 全部通过，无诊断。
 - 输出：[`architecture/elsewhere-architecture.html`](architecture/elsewhere-architecture.html) 和嵌入 README 的 PNG。
 
@@ -205,8 +209,10 @@ cell_network_type=LTE
 - AMap 瓦片、Photon 地理编码、GitHub API 都依赖第三方网络与条款。
 - 快速连续添加航点时，自动缩放动画会延迟后续点击的落点；属于已知交互问题。
 - 8sp 微标签在小屏/强光下的可读性需要进一步真机评估。
-- Frida Hook 的 Java 层 dispatch 行为尚未在真实 Root / Gadget 环境中联调；厂商字段差异可能让 handle 映射失效。
-- Frida 注入是外部工作流，应用本身不能在无 Root 情况下 attach 第三方进程；这是平台边界，不是 UI 缺陷。
+- Frida Hook 的 Java 层 dispatch 行为尚未用真正注册传感器的目标联调；厂商字段差异可能让 handle 映射失效。
+- JDWP 路径只对 debuggable 目标有效；生产包仍需 Root/Gadget 或 LSPatch/VirtualXposed 等 patch/虚拟空间路线。
+- 本轮没有内置 Xposed 模块；LSPatch / VirtualXposed 只是文档中的备选思路，不是已实现能力。
+- PriviSense 是 rooted-device 研究框架，不可当作无 Root 通用方案。
 - 录制路线依赖模拟会话存活；进程被系统杀死时，尚未结束的录制会丢失。
 
 ---

@@ -1,7 +1,7 @@
 # Architecture diagram
 
 Generated with **Archify 3.2.0** from the repository at revision
-`ff70aa9770ec7e9a4df93f95a602d0cc386ea78f`.
+`ad891b93fa808c32b4c4f129e7d61a793e4bf471`.
 
 - Interactive artifact: [`elsewhere-architecture.html`](elsewhere-architecture.html)
 - README image: [`elsewhere-architecture.png`](elsewhere-architecture.png)
@@ -26,5 +26,9 @@ The diagram deliberately separates:
 - the no-root location path (`MockLocationService` → test providers);
 - route recording (`RouteRecorder`);
 - the Shizuku shell/AppOps channel;
-- the external Frida environment, which needs root + frida-server or a Gadget
-  build and is not an in-app automatic injector.
+- the external Frida runtime, with three distinct paths:
+  - **JDWP** through `frida-jdwp-loader` (no root, debuggable targets only);
+  - a **root frida-server** (any target);
+  - a **Frida Gadget** repackaged into the target.
+- LSPatch / VirtualXposed are patch-or-virtualize routes, not the JDWP path;
+  they are noted in the interactive cards and are not integrated as a runtime.

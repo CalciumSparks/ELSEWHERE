@@ -48,7 +48,12 @@ Android、Google 是 Google LLC 的商标。高德、百度、Shizuku、OpenStre
 第三方地图、瓦片、接口和服务的可用性、内容、合规性由对应提供方负责。使用者应自行确认其使用场景、应用服务条款与所在地区法律。详见根目录 `README.md` 与 `LICENSE`。
 ## 外部工具（不随应用分发）
 
-- **Frida** — 动态插桩工具，采用其自身的 wxWindows Library Licence / 相关许可。他乡只生成并分发自己的 JavaScript Hook 脚本；Frida 客户端与 frida-server 由用户另行安装。此项目不包含 Frida 二进制。
+- **Frida** — 动态插桩工具，采用其自身的 wxWindows Library Licence / 相关许可。他乡只生成并分发自己的 JavaScript Hook 脚本；Frida 客户端、frida-server 和 Frida Gadget 由用户另行安装。此项目不包含 Frida 二进制。
+- **frida-jdwp-loader** — 第三方 MIT 许可的 JDWP 注入脚本，用于 no-root / debuggable 目标路径；不随应用分发。  
+  https://github.com/frankheat/frida-jdwp-loader
+- **LSPatch / VirtualXposed / Xposed** — 未集成，也未随应用分发；它们需要 patch APK 或虚拟空间，并需要单独的 Xposed 模块。
+- **PriviSense** — ICSE 2026 Demo / arXiv:2601.22414 的研究工作，运行于 rooted Android；本项目未复制或集成其代码。  
+  https://arxiv.org/abs/2601.22414
 - **Archify** — 用于生成 `docs/architecture` 中的架构图；不是应用的运行时依赖。
 
-Frida 的动态 Hook 需要 Root + frida-server，或一个已打包 Frida Gadget 的目标 APK。使用前请确认目标应用、设备和环境的授权。
+Frida 的动态 Hook 需要 JDWP（仅 debuggable 目标）、Root + frida-server，或一个已打包 Frida Gadget 的目标 APK。使用前请确认目标应用、设备和环境的授权。

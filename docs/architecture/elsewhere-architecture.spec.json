@@ -9,7 +9,7 @@
     "repository": {
       "url": "git@github.com:CalciumSparks/ELSEWHERE.git",
       "link_mode": "local-only",
-      "revision": "ff70aa9770ec7e9a4df93f95a602d0cc386ea78f"
+      "revision": "ad891b93fa808c32b4c4f129e7d61a793e4bf471"
     }
   },
   "components": [
@@ -71,15 +71,15 @@
       "sources": [
         {
           "path": "app/src/main/java/com/elsewhere/location/ui/ElsewhereViewModel.kt",
-          "line": 54
+          "line": 55
         },
         {
           "path": "app/src/main/java/com/elsewhere/location/ui/ElsewhereViewModel.kt",
-          "line": 645
+          "line": 646
         },
         {
           "path": "app/src/main/java/com/elsewhere/location/ui/ElsewhereViewModel.kt",
-          "line": 902
+          "line": 903
         }
       ]
     },
@@ -252,15 +252,15 @@
       "sources": [
         {
           "path": "app/src/main/java/com/elsewhere/location/data/FridaSensorRepository.kt",
-          "line": 39
+          "line": 79
         },
         {
           "path": "app/src/main/java/com/elsewhere/location/data/FridaSensorRepository.kt",
-          "line": 45
+          "line": 129
         },
         {
           "path": "app/src/main/java/com/elsewhere/location/data/FridaSensorRepository.kt",
-          "line": 84
+          "line": 165
         }
       ]
     },
@@ -284,7 +284,7 @@
       "label": "Frida client",
       "sublabel": "PC · Termux",
       "pos": [
-        835,
+        790,
         520
       ],
       "size": [
@@ -298,7 +298,7 @@
       "label": "frida-server",
       "sublabel": "root · ptrace",
       "pos": [
-        835,
+        790,
         650
       ],
       "size": [
@@ -312,11 +312,26 @@
       "label": "Target app",
       "sublabel": "SystemSensorManager",
       "pos": [
-        1070,
-        650
+        1020,
+        760
       ],
       "size": [
         150,
+        60
+      ]
+    },
+    {
+      "id": "jdwp_loader",
+      "type": "external",
+      "label": "frida-jdwp-loader",
+      "sublabel": "ADB + JDWP · host",
+      "tag": "debuggable only",
+      "pos": [
+        560,
+        760
+      ],
+      "size": [
+        180,
         60
       ]
     }
@@ -338,11 +353,12 @@
     },
     {
       "kind": "region",
-      "label": "EXTERNAL FRIDA ENV · ROOT / GADGET",
+      "label": "EXTERNAL FRIDA RUNTIME · ROOT / GADGET / JDWP",
       "wraps": [
         "frida_client",
         "frida_server",
-        "target_app"
+        "target_app",
+        "jdwp_loader"
       ]
     }
   ],
@@ -432,6 +448,19 @@
       "to": "target_app",
       "label": "inject",
       "variant": "dashed"
+    },
+    {
+      "id": "frida-to-jdwp",
+      "from": "frida_bridge",
+      "to": "jdwp_loader",
+      "label": "script"
+    },
+    {
+      "id": "jdwp-to-target",
+      "from": "jdwp_loader",
+      "to": "target_app",
+      "label": "JDWP",
+      "variant": "dashed"
     }
   ],
   "cards": [
@@ -456,9 +485,9 @@
       "dot": "rose",
       "title": "Frida sensor bridge",
       "items": [
-        "The app generates the JavaScript and can copy it to /data/local/tmp.",
-        "A root frida-server or Frida Gadget must inject it into the target process.",
-        "Shizuku can deploy files and grant AppOps; it cannot ptrace another app."
+        "JDWP: no root, frida-jdwp-loader, debuggable targets only.",
+        "Root frida-server covers any app; Gadget requires repackaging.",
+        "Shizuku deploys files and grants AppOps; it cannot ptrace another app."
       ]
     },
     {
@@ -467,6 +496,16 @@
       "items": [
         "AMap / OSM tiles, Photon geocoding and GitHub Release checks use HTTPS.",
         "App scan, cache snapshot and real-GPS probe are secondary feature branches."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "LSPatch / VirtualXposed",
+      "items": [
+        "These are patch-or-virtualize routes, not JDWP injection.",
+        "LSPatch needs an Xposed module and a modified APK.",
+        "VirtualXposed runs the target inside its virtual space.",
+        "Neither is integrated in this build; JDWP is the no-repackaging route."
       ]
     }
   ]
