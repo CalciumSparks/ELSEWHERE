@@ -47,6 +47,14 @@ $localGadget = Get-ChildItem $root -Filter "frida-gadget-*.so" -File -ErrorActio
 if ($null -ne $localGadget) {
     Write-Host "Using local Gadget: $($localGadget.FullName)"
     $loaderArgs += @("-g", $localGadget.FullName)
+} else {
+    $versionFile = Join-Path $root "frida-version.txt"
+    $fridaVersion = "16.7.19"
+    if (Test-Path $versionFile) {
+        $fridaVersion = (Get-Content -Raw $versionFile).Trim()
+    }
+    Write-Host "Downloading pinned Frida Gadget: $fridaVersion"
+    $loaderArgs += @("-g", $fridaVersion)
 }
 
 & $python.Source @pythonArgs $loader @loaderArgs

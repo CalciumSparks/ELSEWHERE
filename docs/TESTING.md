@@ -183,13 +183,17 @@ cell_network_type=LTE
 
 - 环境页提供三种注入路径：JDWP（免 Root）、Root frida-server、Frida Gadget；目标包名、Shizuku / su / frida-server 检测、当前模式/通道展示。
 - 输入 `com.android.chrome` 后「检测环境」显示 `TARGET: NOT DEBUGGABLE`、`JDWP: NO`，并出现 JDWP 不适用提示。
-- 输入 debuggable 的 `com.elsewhere.location` 后显示 `TARGET: DEBUGGABLE`、`JDWP: AVAILABLE`；生成 JDWP 脚本，命令包含 `frida-jdwp-loader.py frida -n ... -i script -l ...`。
+- 输入 debuggable 的 `com.elsewhere.location` 后显示 `TARGET: DEBUGGABLE`、`JDWP: AVAILABLE`；生成 JDWP 脚本，命令包含 `frida-jdwp-loader.py ... -i script ... -g 16.7.19`。
 - 脚本可由 `adb pull` 读取，配置 target/mode/sensors 正确，`node --check` 通过。
-- **真实 JDWP 注入验证成功**：在 Android 15 x86_64 模拟器上使用 `frida-jdwp-loader` + Frida Gadget 17.24.3；loader 完成 JDWP handshake、`set-debug-app`、Gadget 上传和 `Runtime.load`，输出 `Library injection successful!`，目标重启后正常运行。全程**无 Root、无 APK 重打包**。
+- **真实 JDWP 注入 + 传感器改写验证成功**：
+  - 第一轮使用 Frida Gadget 17.24.3：JDWP handshake、Gadget 上传、`Runtime.load` 和 `Library injection successful!` 都成功，但脚本没有任何 `ELSEWHERE-SENSOR` 输出，目标传感器值也不变。
+  - 根因是 **Frida 17 移除了 Gadget 的 Java bridge**，`Java.perform` 无法使用。
+  - 改用 **Frida Gadget 16.7.19** 后，脚本正常执行。另建一个最小 debuggable 传感器目标 App，注册加速度/陀螺/重力/线性加速度；注入后 logcat 出现 `ELSEWHERE-SENSOR ready`，重力从约 `0.003, 9.773, 0.808` 变为 `0,0,9.81`，加速度变为脚本生成的时变曲线。
+  - 全程**无 Root、无 APK 重打包**。
 - Windows 主机上 loader 的包名校验因 CRLF 报 `Invalid package name`；vendored loader 已用 `.strip()` 修复并随一键包发布。
-- **一键包完整链路验证**：应用内点「导出 / 分享一键注入包」生成 24,383 B ZIP，分享面板正常打开；adb pull 后解压得到脚本、`frida-jdwp-loader.py`、`target.txt`、Windows/macOS/Linux 启动脚本、MIT 许可和说明。放入本机 x86_64 Gadget 后执行 `run-jdwp-windows.ps1`，脚本完成 adb/Python 检查、目标重启、JDWP handshake、Gadget 上传与 `Runtime.load`，loader 输出 `Library injection successful!` 且退出码 0。全程无 Root、无重打包。
-- QA 目标 `com.elsewhere.location` 没有注册系统 `SensorManager` 监听，因此没有观察到传感器事件；`ELSEWHERE-SENSOR` logcat 也没有 ready/事件输出。传感器 dispatch 行为仍需真正使用传感器的目标 App 联调。Root/Gadget 路径未做真实设备矩阵测试。
+- **一键包完整链路验证**：应用内点「导出 / 分享一键注入包」生成 ZIP，分享面板正常打开；adb pull 后解压得到脚本、`frida-jdwp-loader.py`、`target.txt`、`frida-version.txt`、Windows/macOS/Linux 启动脚本、MIT 许可和说明。解压后执行 `run-jdwp-windows.ps1`，脚本完成 adb/Python 检查、目标重启、JDWP handshake、Gadget 上传与 `Runtime.load`，loader 输出 `Library injection successful!` 且退出码 0。
 - 平台边界：Android App 不能充当 ADB host 或代替目标包执行 `adb forward`；一键包已经把 host 侧脚本打包完整，因此仍需要电脑/Termux 作为 ADB host。
+- Root frida-server 与 Gadget 重打包路径未做真机矩阵；LSPatch / VirtualXposed 未集成。
 - 实现与操作说明见 [`FRIDA_SENSOR_BRIDGE.md`](FRIDA_SENSOR_BRIDGE.md)。
 
 ### 2.14 Archify 架构图

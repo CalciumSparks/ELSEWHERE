@@ -980,7 +980,7 @@ private fun FridaSensorBridgeSection(
                     )
                     Spacer(Modifier.height(5.dp))
                     Text(
-                        "ZIP 内含脚本、frida-jdwp-loader、Windows 与 macOS/Linux 启动脚本；电脑上执行一条命令。",
+                        "ZIP 内含脚本、frida-jdwp-loader、Windows 与 macOS/Linux 启动脚本，并固定 Frida 16.7.19；电脑上执行一条命令。",
                         style = MonoTiny.copy(fontSize = 7.sp),
                         color = Paper.copy(alpha = 0.5f),
                     )

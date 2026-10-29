@@ -35,7 +35,9 @@ git clone https://github.com/frankheat/frida-jdwp-loader.git
 cd frida-jdwp-loader
 ```
 
-`frida-jdwp-loader` 是一个 MIT 许可的 Python 3 脚本，使用 JDWP 和 ADB 把 frida-gadget 注入可调试进程。它会在需要时自动下载对应 ABI 的 Gadget。
+`frida-jdwp-loader` 是一个 MIT 许可的 Python 3 脚本，使用 JDWP 和 ADB 把 frida-gadget 注入可调试进程。
+
+> **必须使用 Frida Gadget 16.x。** Frida 17 起，Gadget 不再内置 Java bridge；本脚本使用 `Java.perform`，在 17.x Gadget 上会直接失效。本项目固定 **16.7.19**，并已实测可注入、可改写传感器。
 
 ### 在应用内
 
@@ -55,6 +57,7 @@ frida-jdwp-loader.LICENSE    MIT 许可
 run-jdwp-windows.ps1         Windows 启动脚本
 run-jdwp-unix.sh             macOS / Linux 启动脚本
 target.txt                   目标包名
+frida-version.txt            固定 16.7.19
 README.txt                   使用说明
 KIT-INFO.txt                 生成信息与目标 debuggable 状态
 ```
@@ -72,20 +75,24 @@ chmod +x run-jdwp-unix.sh
 ./run-jdwp-unix.sh
 ```
 
-启动脚本会检查 adb/Python 3，读取 target.txt，并在目录中存在 `frida-gadget-*.so` 时自动传 `-g`；否则由 loader 下载对应 ABI 的 Gadget。
+启动脚本会检查 adb/Python 3，读取 target.txt；如果目录中存在 `frida-gadget-*.so` 就使用本地文件，否则读取 `frida-version.txt` 并传 `-g 16.7.19`，由 loader 下载对应 ABI 的 Gadget。
 
 > Android 应用无法充当 ADB host，也不能替另一个 UID 创建 `adb forward`。因此“完整集成”的边界是：他乡负责生成、打包、目标检查和分享；实际 JDWP 连接必须由电脑或 Termux 上的 ADB 完成。这个边界不是 UI 偷懒，而是 JDWP/adb 传输层的平台约束。
 
-### 实测：应用导出 → 电脑启动 → 注入成功
+### 实测：应用导出 → 电脑启动 → 真实传感器改写
 
-在 Android 15 x86_64 模拟器、无 Root、目标为 debuggable 的 `com.elsewhere.location`：
+在 Android 15 x86_64 模拟器、无 Root、无 APK 重打包：
 
-1. 应用生成脚本并导出 ZIP（24,383 B）。
-2. 解压 ZIP，放入本机 x86_64 Gadget，运行 `run-jdwp-windows.ps1`。
-3. 启动脚本完成 adb/Python 检查、目标重启、JDWP handshake、Gadget 上传和 `Runtime.load`。
-4. loader 输出 `Library injection successful!`，退出码 0。
+1. 应用生成脚本并导出 ZIP（24,839 B）；ZIP 内是脚本、vendored loader、启动脚本、target.txt、frida-version.txt 和许可证。
+2. 解压 ZIP，放入本机 x86_64 **Frida 16.7.19** Gadget，运行 `run-jdwp-windows.ps1`。
+3. 启动脚本完成 adb/Python 检查、目标重启、JDWP handshake、Gadget 上传和 `Runtime.load`；loader 输出 `Library injection successful!`，退出码 0。
+4. 另建一个最小 debuggable 传感器目标 App，注册加速度计、陀螺仪、重力与线性加速度。未注入前，系统给的 values 是设备的固定/噪声值；注入后：
+   - logcat 的 `ELSEWHERE-SENSOR` 出现 `ready` 事件；
+   - 重力读数从约 `0.003, 9.773, 0.808` 变为 `0.0, 0.0, 9.81`；
+   - 加速度读数变为随时间变化的 `x/y/z`（脚本的步态曲线）。
+5. 这验证了 Hook 的真实效果，而不仅是脚本生成/注入成功。
 
-目标 App 本身不注册系统传感器监听，因此仍没有实际传感器事件可供观察；`ELSEWHERE-SENSOR` logcat 也没有 ready 日志。传感器 dispatch 的最终行为需要在真正使用 `SensorManager` 的目标上验证。
+> 最初 QA 使用 Frida 17.24.3 Gadget 时，JDWP 注入成功但脚本完全不动；排查后确认是 Frida 17 移除了 Java bridge。换用 16.7.19 后 `Java.perform` 正常，传感器值被改写。这也是本项目固定 16.7.19 的原因。
 
 ### 电脑端命令
 
@@ -95,7 +102,8 @@ adb pull '/storage/emulated/0/Android/data/com.elsewhere.location/files/frida/el
 python frida-jdwp-loader.py frida \
   -n com.example.target \
   -i script \
-  -l ./elsewhere-sensor.js
+  -l ./elsewhere-sensor.js \
+  -g 16.7.19
 ```
 
 如果 loader 位于其他目录，`-l` 使用脚本的绝对路径，或在 `frida-jdwp-loader` 目录里执行。
@@ -107,15 +115,6 @@ adb logcat -s ELSEWHERE-SENSOR:*
 ```
 
 脚本在 JDWP/Gadget 自主模式下没有 Frida CLI 消息通道，因此同时使用 `android.util.Log` 和 `send()`；前者用于 JDWP，后者用于 CLI attach。
-
-### 本次验证结果
-
-在 Android 15 x86_64 模拟器上，目标为 **debuggable 的 `com.elsewhere.location`**：
-
-- loader 成功完成 JDWP handshake、`set-debug-app`、Gadget 上传与 `Runtime.load`。
-- loader 输出 `Library injection successful!`，系统 `nativeloader` 记录 Gadget 加载，目标进程重启并正常运行。
-- 目标 App 没有注册系统 `SensorManager` 监听，因此本次没有可观察的传感器事件；脚本的 `ready` / 事件日志还需用真正使用传感器的目标 App 做进一步联调。
-- 该路径**未使用 Root**，也未重打包 APK。
 
 ### Windows 注意事项
 
@@ -239,8 +238,8 @@ const CONFIG = {
 
 - **`Invalid package name`（Windows）**  
   先看上面的 CRLF 说明；在 WSL 中运行，或给 loader 的包名校验加 `.strip()`。
-- **JDWP 注入成功，但目标没有传感器数据**  
-  目标可能没有注册传感器、没有收到事件，或使用 native 路径。请换一个真正使用 `SensorManager` 的测试 App，并用 `adb logcat -s ELSEWHERE-SENSOR:*` 检查 `ready` / `unmapped-sensor`。
+- **JDWP 注入成功，但 `ELSEWHERE-SENSOR` 没有 ready、传感器值也不变**  
+  先确认使用的是 **Frida Gadget 16.x**。17.x 移除了 Java bridge，本脚本会静默失效；一键包固定 16.7.19。若版本正确，再检查目标是否注册传感器、是否收到事件，或是否走 native 路径。用 `adb logcat -s ELSEWHERE-SENSOR:*` 查看 `ready` / `unmapped-sensor`。
 - **`Unable to find debugger` / JDWP 连接失败**  
   确认目标 debuggable；某些 ROM 会禁止 `am set-debug-app`，或需要在开发者选项里允许调试。
 - **脚本路径在电脑上打不开**  
@@ -256,3 +255,5 @@ const CONFIG = {
 - 不要用于绕过反作弊、欺诈或未经授权的监控。
 - Frida、frida-jdwp-loader、目标应用、Shizuku 和高德/百度服务各有自己的条款。
 - `frida-jdwp-loader` 是第三方 MIT 工具；本项目只生成自己的 JavaScript Hook 脚本。
+
+

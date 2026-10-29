@@ -14,7 +14,11 @@ NOT require root and does NOT repackage the target APK.
 - Python 3 in PATH (the loader uses only the standard library).
 - Network access on first run unless you drop a matching `frida-gadget-*.so`
   into this directory: the launchers detect that file and pass `-g` to the
-  loader; otherwise the loader downloads the matching ABI automatically.
+  loader; otherwise the launcher downloads the pinned version in
+  `frida-version.txt` (16.7.19) for the target ABI.
+- Why 16.7.19? Frida 17 removed the Java bridge from Gadget. The script uses
+  `Java.perform`, so the tested, compatible Gadget is 16.7.19. If you use
+  Frida 17, bundle the script with frida-compile and `frida-java-bridge`.
 
 ## Windows
 

@@ -43,6 +43,13 @@ LOCAL_GADGET="$(find "$ROOT" -maxdepth 1 -type f -name 'frida-gadget-*.so' | hea
 if [[ -n "$LOCAL_GADGET" ]]; then
     echo "Using local Gadget: $LOCAL_GADGET"
     ARGS+=(-g "$LOCAL_GADGET")
+else
+    FRIDA_VERSION="16.7.19"
+    if [[ -f "$ROOT/frida-version.txt" ]]; then
+        FRIDA_VERSION="$(tr -d '\r\n' < "$ROOT/frida-version.txt")"
+    fi
+    echo "Downloading pinned Frida Gadget: $FRIDA_VERSION"
+    ARGS+=(-g "$FRIDA_VERSION")
 fi
 
 exec "$PYTHON" frida-jdwp-loader.py "${ARGS[@]}"

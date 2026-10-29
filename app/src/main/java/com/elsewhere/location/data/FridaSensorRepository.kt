@@ -17,6 +17,12 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+/**
+ * Frida 17 removed the Java bridge from Gadget. The hook uses Java.perform(),
+ * so the JDWP kit pins the last tested Gadget that ships the bridge.
+ */
+const val JDWP_FRIDA_VERSION = "16.7.19"
+
 enum class FridaInjectionMode(
     val shortLabel: String,
     val title: String,
@@ -233,7 +239,8 @@ class FridaSensorRepository(
                 appendLine(pullCommand)
                 append("python frida-jdwp-loader.py frida -n ")
                     .append(packageName)
-                    .append(" -i script -l ./elsewhere-sensor.js")
+                    .append(" -i script -l ./elsewhere-sensor.js -g ")
+                    .append(JDWP_FRIDA_VERSION)
             }
             FridaInjectionMode.ROOT_SERVER -> buildString {
                 appendLine(pullCommand)
@@ -333,6 +340,7 @@ class FridaSensorRepository(
                     addAssetEntry(zip, "frida/JDWP-KIT-README.txt", "README.txt")
                     addAssetEntry(zip, "frida/run-jdwp-windows.ps1", "run-jdwp-windows.ps1")
                     addAssetEntry(zip, "frida/run-jdwp-unix.sh", "run-jdwp-unix.sh")
+                    addAssetEntry(zip, "frida/frida-version.txt", "frida-version.txt")
                     addTextEntry(
                         zip,
                         "KIT-INFO.txt",
@@ -341,6 +349,7 @@ class FridaSensorRepository(
                             appendLine("target=${artifact.targetPackage}")
                             appendLine("mode=${artifact.injectionMode.shortLabel}")
                             appendLine("sensors=${artifact.sensorSummary}")
+                            appendLine("fridaGadget=$JDWP_FRIDA_VERSION")
                             appendLine("generated=${artifact.generatedAtEpochMs}")
                             appendLine("targetDebuggable=${artifact.targetInfo.debuggable}")
                             appendLine()
