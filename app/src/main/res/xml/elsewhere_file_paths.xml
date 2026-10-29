@@ -6,4 +6,10 @@
     <files-path
         name="frida_internal"
         path="frida/" />
+    <external-files-path
+        name="xposed_external"
+        path="xposed/" />
+    <files-path
+        name="xposed_internal"
+        path="xposed/" />
 </paths>

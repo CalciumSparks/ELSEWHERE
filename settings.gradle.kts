@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Elsewhere"
 include(":app")
+include(":xposed-sensor")

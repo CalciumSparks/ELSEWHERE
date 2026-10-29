@@ -66,6 +66,7 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
     private val cacheRepository = container.cacheBackupRepository
     private val diagnosticsRepository = container.diagnosticsRepository
     private val fridaRepository = container.fridaSensorRepository
+    private val xposedRepository = container.xposedModuleRepository
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
@@ -100,6 +101,9 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _fridaUi = MutableStateFlow(FridaUiState())
     val fridaUi: StateFlow<FridaUiState> = _fridaUi.asStateFlow()
+
+    private val _xposedUi = MutableStateFlow(XposedUiState())
+    val xposedUi: StateFlow<XposedUiState> = _xposedUi.asStateFlow()
 
     private val _mapCommands = MutableSharedFlow<MapCommand>(
         replay = 0,
@@ -1177,6 +1181,69 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
                         )
                     }
                 }
+        }
+    }
+
+    fun xposedAdbCommand(): String {
+        val current = settings.value
+        return xposedRepository.configCommand(
+            mode = current.motionMode,
+            speedMps = current.speeds.forMode(current.motionMode),
+            sensors = current.sensors,
+        )
+    }
+
+    fun exportXposedModule() {
+        if (_xposedUi.value.exporting) return
+        _xposedUi.update { it.copy(exporting = true, error = null) }
+        viewModelScope.launch {
+            xposedRepository.exportModule()
+                .onSuccess { file ->
+                    _xposedUi.update {
+                        it.copy(
+                            exporting = false,
+                            modulePath = file.absolutePath,
+                            notice = "Xposed 模块已导出；安装后用 LSPatch 选择它，或放进 VirtualXposed。",
+                        )
+                    }
+                    _events.tryEmit(UiEvent.ShareFile(file.absolutePath))
+                }
+                .onFailure { error ->
+                    _xposedUi.update {
+                        it.copy(
+                            exporting = false,
+                            error = error.message ?: "导出 Xposed 模块失败。",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun writeXposedConfig() {
+        if (_xposedUi.value.writingConfig) return
+        _xposedUi.update { it.copy(writingConfig = true, error = null) }
+        viewModelScope.launch {
+            val current = settings.value
+            xposedRepository.writeConfig(
+                mode = current.motionMode,
+                speedMps = current.speeds.forMode(current.motionMode),
+                sensors = current.sensors,
+            ).onSuccess { message ->
+                _xposedUi.update {
+                    it.copy(
+                        writingConfig = false,
+                        notice = message,
+                    )
+                }
+                _events.tryEmit(UiEvent.Message(message))
+            }.onFailure { error ->
+                _xposedUi.update {
+                    it.copy(
+                        writingConfig = false,
+                        error = error.message ?: "写入 Xposed 模块配置失败。",
+                    )
+                }
+            }
         }
     }
 

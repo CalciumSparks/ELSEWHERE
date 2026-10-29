@@ -8,6 +8,7 @@ import com.elsewhere.location.data.GeocodingRepository
 import com.elsewhere.location.data.SettingsRepository
 import com.elsewhere.location.data.TargetAppRepository
 import com.elsewhere.location.data.UpdateRepository
+import com.elsewhere.location.data.XposedModuleRepository
 import com.elsewhere.location.location.RealLocationProbe
 import com.elsewhere.location.shizuku.ShizukuManager
 import okhttp3.OkHttpClient
@@ -39,6 +40,10 @@ class AppContainer(context: Context) {
         shizukuManager = shizukuManager,
     )
     val fridaSensorRepository: FridaSensorRepository = FridaSensorRepository(
+        context = appContext,
+        shizuku = shizukuManager,
+    )
+    val xposedModuleRepository: XposedModuleRepository = XposedModuleRepository(
         context = appContext,
         shizuku = shizukuManager,
     )

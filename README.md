@@ -7,8 +7,8 @@
 [![他乡系统结构](docs/architecture/elsewhere-architecture.png)](docs/architecture/elsewhere-architecture.html)
 
 > **分支状态 / Branch status**  
-> `main` 在 `v1.0.0` 之后新增了 **路线录制** 与 **Frida Sensor Bridge**；这两项尚未进入新的 GitHub Release。当前公开 APK 仍是 `v1.0.0`，如需使用新功能请从源码构建。  
-> `main` adds **route recording** and the **Frida Sensor Bridge** after `v1.0.0`. The latest public APK is still `v1.0.0`; build from source to try the new work.
+> `main` 在 `v1.0.0` 之后新增了 **路线录制**、**Frida Sensor Bridge** 与 **LSPatch / Xposed 模块**；这些尚未进入新的 GitHub Release。当前公开 APK 仍是 `v1.0.0`，如需使用新功能请从源码构建。  
+> `main` adds **route recording**, the **Frida Sensor Bridge** and an **LSPatch / Xposed module** after `v1.0.0`. The latest public APK is still `v1.0.0`; build from source to try the new work.
 
 ---
 
@@ -24,7 +24,9 @@
 - **Root frida-server**：适用于任意 App，但设备必须 Root。
 - **Frida Gadget**：无需 Root，但必须重打包并重新签名目标 APK。
 
-没有外部注入环境时，应用只生成和部署脚本，不会假装已经 Hook 了其他 App。LSPatch / VirtualXposed 属于 patch/虚拟空间路线，需要额外的 Xposed 模块，本项目未内置。
+没有外部注入环境时，应用只生成和部署脚本，不会假装已经 Hook 了其他 App。
+
+另外还内置了一个 **LSPatch / VirtualXposed 的 classic Xposed 模块**（API 82）。它不需要 Root，但要求目标 APK 被 LSPatch patch，或目标运行在 VirtualXposed 的虚拟空间；它不是“注入任意未修改 App”的银弹。
 
 ### 核心能力
 
@@ -39,6 +41,7 @@
 - Wi-Fi / 蓝牙 / 基站 extras、场景预设、应用内传感器推演。
 - 应用扫描、缓存占用、手动系统清理入口、外部缓存快照。
 - **Frida Sensor Bridge**：生成真实 JavaScript Hook，通过目标进程的 `SystemSensorManager` 改写六类传感器事件；支持 JDWP 免 Root（debuggable 目标）、Root frida-server 和 Frida Gadget 三种注入路径。
+- **LSPatch / VirtualXposed Xposed 模块**：内置可导出的 API 82 模块 APK，供 patch/虚拟空间路线使用；读取当前 WALK/RUN/CYCLE 配置并可改写六类传感器事件。
 - Shizuku / Root / Hook 诊断，GitHub Release 更新检查。
 
 ### 真实 / 模拟边界
@@ -51,6 +54,7 @@
 | 路线录制 | **应用内采样** | 采样当前被注入的坐标，保存为普通 RoutePlan。 |
 | 应用内传感器 | **仅应用内推演** | 无 Root 无法把传感器流交给其他 App。 |
 | Frida 传感器 Hook | **真实 Hook 脚本（外部注入）** | JDWP 免 Root 仅限 debuggable 目标；Root/Gadget 覆盖其他目标；只影响目标进程。 |
+| LSPatch / Xposed 模块 | **真实 Hook（patch/虚拟空间）** | 目标 APK 需被 LSPatch patch，或运行在 VirtualXposed；API 82 模块。 |
 | Wi-Fi / 蓝牙 / 基站 | **Location extras** | 不改变系统无线电扫描。 |
 | 清理其他 App 缓存 | **系统页面手动完成** | Shizuku shell 不具备 `INTERNAL_DELETE_CACHE_FILES`。 |
 
@@ -144,15 +148,29 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 
 详细环境、命令与排错：[`docs/FRIDA_SENSOR_BRIDGE.md`](docs/FRIDA_SENSOR_BRIDGE.md)。
 
-> **不要把“脚本已生成”当成“Hook 已生效”。** Shizuku 没有跨进程 ptrace 权限；JDWP 通过 ADB 调试协议工作，但只对可调试目标有效。LSPatch / VirtualXposed 需要 patch 或虚拟空间，并且需要额外 Xposed 模块，本项目未内置。
+> **不要把“脚本已生成”当成“Hook 已生效”。** Shizuku 没有跨进程 ptrace 权限；JDWP 通过 ADB 调试协议工作，但只对可调试目标有效。LSPatch / VirtualXposed 使用下面的独立 Xposed 模块，需要 patch 或虚拟空间；不要把它和 JDWP 混为一谈。
 
 相关研究：PriviSense（[arXiv:2601.22414](https://arxiv.org/abs/2601.22414)，ICSE 2026 Demo）展示了 Frida 多传感器欺骗，但其运行前提是 **rooted Android**；本项目只借鉴问题定义，没有集成其代码。`frida-jdwp-loader` 是 MIT 许可的第三方免 Root 注入工具。
+
+### LSPatch / VirtualXposed 模块
+
+环境页 →「05 LSPatch / Xposed」提供内置的 **classic Xposed API 82** 模块：
+
+- 模块包名：`com.elsewhere.location.xposed`；Hook `SystemSensorManager$SensorEventQueue.dispatchSensorEvent`。
+- 点「导出模块 APK」安装；用 LSPatch 选择目标 APK 并勾选模块，patch 后安装；或在 VirtualXposed 中同时安装目标与模块。
+- 模块默认 `WALK / 1.35 m/s / 全部传感器`。点「写入当前配置」通过 Shizuku 写入 `Settings.Global.elsewhere_sensor_config`，或复制 ADB 命令；模块每 2 秒重读。
+- 模块本身不注入未修改的 App；LSPatch 会改变签名，VirtualXposed 会改变运行容器。
+
+详细步骤、配置格式和限制：[`docs/LSPATCH_XPOSED.md`](docs/LSPATCH_XPOSED.md)。
+
+> **LSPatch 运行时已验证**：使用官方 LSPatch v1.2 CLI 把模块嵌入目标 APK，patched APK 安装后 logcat 出现 `ELSEWHERE-XPOSED: installed hooks`；重力和加速度被真实改写；通过全局配置关闭后恢复原始值，再开启后再次生效。
 
 ### 缓存与限制
 
 - 缓存清理由系统应用信息页手动完成；Shizuku 无法静默清理其他应用缓存。
 - 应用可保存**可访问的外部缓存**快照；写回的所有者仍是 `shell`，目标应用不保证能读取。内部私有缓存无法备份。
-- JDWP 无 Root 只适用于 debuggable 目标；非 debuggable 的生产包仍需 Root、Gadget，或需要 patch/虚拟空间的 LSPatch/VirtualXposed（后者还缺 Xposed 模块，本项目未内置）。
+- JDWP 无 Root 只适用于 debuggable 目标；非 debuggable 的生产包仍需 Root、Gadget，或使用 LSPatch / VirtualXposed 模块（必须 patch 或虚拟化目标）。
+- LSPatch 会修改目标 APK 的签名；VirtualXposed 使用虚拟容器。两者都可能被完整性/Xposed 检测发现。
 - 无 Root 不能改变系统 Wi-Fi / 蓝牙 / 基站扫描结果。
 - 注入位置会被系统标记为 mock；不绕过反作弊或 Mock 检测。
 - 路线录制采样的是**当前模拟输出**，不是独立的真实 GPS 轨迹记录器。
@@ -164,7 +182,7 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 环境：JDK 17/21、Android SDK 35、Gradle Wrapper 8.9。
 
 ```bash
-./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :xposed-sensor:assembleRelease
 ```
 
 - 19 个 JVM 单元测试通过：Geo、ChineseGeo、MotionEngine、RouteRecorder、更新版本比较、设置序列化。
@@ -173,7 +191,7 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 - **JDWP 一键包已验证到传感器值层**：应用内导出 ZIP → Windows 启动脚本 → loader 注入 debuggable 的测试 App，`Library injection successful!`；全程无 Root、无重打包。
 - 另建了一个最小 debuggable 传感器目标 App（注册加速度/陀螺/重力/线性加速度）。注入后 logcat 出现 `ELSEWHERE-SENSOR ready`，且目标收到的值从原始固定值变为脚本生成的时变值：重力变为 `0,0,9.81`，加速度变为时间变化的 `x/y/z`。这证明 Hook 不只是“脚本生成成功”，而是真的改写了 `SensorEvent`。
 - 使用 **Frida Gadget 16.7.19**；Frida 17 的 Gadget 移除了 Java bridge，直接加载本脚本会失败。一键包和 README 已固定 16.7.19；如要 Frida 17，需用 `frida-compile` 打包 `frida-java-bridge`。
-- Root frida-server 与 Gadget 重打包路径仍未做真机矩阵；LSPatch / VirtualXposed 仍未集成。
+- Root frida-server 与 Gadget 重打包路径仍未做真机矩阵；LSPatch 模块已通过官方 CLI patch + 安装 + 真实传感器目标验证。VirtualXposed 容器路径尚未实测。
 
 完整验证记录：[`docs/TESTING.md`](docs/TESTING.md)。
 
@@ -181,7 +199,7 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 
 [![Archify architecture](docs/architecture/elsewhere-architecture.png)](docs/architecture/elsewhere-architecture.html)
 
-Archify 架构图覆盖主定位链路、路线录制、Shizuku 通道，以及外部 Frida 的三条注入路径：JDWP（无 Root / debuggable）、Root frida-server、Frida Gadget。可打开交互式 HTML，或查看 [`docs/DESIGN.md`](docs/DESIGN.md) 的设计记录。
+Archify 架构图覆盖主定位链路、路线录制、Shizuku 通道，以及外部 Frida 的三条注入路径：JDWP（无 Root / debuggable）、Root frida-server、Frida Gadget。LSPatch / Xposed 是独立的 patch/虚拟空间路线，详见模块文档；可打开交互式 HTML，或查看 [`docs/DESIGN.md`](docs/DESIGN.md) 的设计记录。
 
 主要模块：
 
@@ -215,7 +233,9 @@ The core location path does not require root. The **Frida Sensor Bridge is an op
 - **Root frida-server**: any app, rooted device required.
 - **Frida Gadget**: no root, but the target APK must be repackaged and re-signed.
 
-Without an external injection environment the app generates and deploys the script; it never claims to have hooked another app. LSPatch / VirtualXposed are patch-or-virtual-space routes requiring an Xposed module; they are not integrated.
+Without an external injection environment the app generates and deploys the script; it never claims to have hooked another app.
+
+A **classic Xposed API 82 module** is also included for LSPatch / VirtualXposed. It requires no root, but the target APK must be patched by LSPatch or run inside VirtualXposed; it is not a way to inject an arbitrary unmodified app.
 
 ### Features
 
@@ -230,6 +250,7 @@ Without an external injection environment the app generates and deploys the scri
 - Wi-Fi / Bluetooth / cell Location extras, presets, in-app sensor telemetry.
 - App scan, cache size, manual system cache cleanup, external cache snapshots.
 - **Frida Sensor Bridge** generating a real JavaScript hook for six Android sensor types, with JDWP (debuggable targets, no root), root frida-server, and Frida Gadget delivery paths.
+- **LSPatch / VirtualXposed Xposed module**: bundled, exportable API 82 module for patch/virtual-space targets, reading the current motion/sensor config.
 - Shizuku / root / hook diagnostics and GitHub Release checks.
 
 ### What is real?
@@ -242,6 +263,7 @@ Without an external injection environment the app generates and deploys the scri
 | Route recording | **App-side sampling** | Samples the currently injected point. |
 | In-app sensors | **App-only telemetry** | No root cannot expose sensor streams to other apps. |
 | Frida sensor hook | **Real hook script, external injection** | JDWP only for debuggable targets; root/Gadget cover other targets; affects the target process only. |
+| LSPatch / Xposed module | **Real hook, patched/virtual target** | Target APK must be patched by LSPatch or run inside VirtualXposed; API 82 module. |
 | Wi-Fi / Bluetooth / cell | **Location extras** | Does not change radio scans. |
 | Cache clearing | **Manual system page** | Shizuku shell lacks `INTERNAL_DELETE_CACHE_FILES`. |
 
@@ -292,7 +314,17 @@ The hook replaces values in `SystemSensorManager$SensorEventQueue.dispatchSensor
 
 Requirements and troubleshooting: [`docs/FRIDA_SENSOR_BRIDGE.md`](docs/FRIDA_SENSOR_BRIDGE.md).
 
-Related work: [PriviSense (arXiv:2601.22414, ICSE 2026 demo)](https://arxiv.org/abs/2601.22414) explores Frida multi-sensor spoofing on **rooted** Android devices; this project is an independent implementation. LSPatch / VirtualXposed are patch-or-virtual-space routes needing an Xposed module, and are not integrated here.
+Related work: [PriviSense (arXiv:2601.22414, ICSE 2026 demo)](https://arxiv.org/abs/2601.22414) explores Frida multi-sensor spoofing on **rooted** Android devices; this project is an independent implementation.
+
+### LSPatch / VirtualXposed module
+
+The app bundles a **classic Xposed API 82** module (`com.elsewhere.location.xposed`) that hooks `SystemSensorManager$SensorEventQueue.dispatchSensorEvent`. In **Environment → 05 LSPatch / Xposed**:
+
+- tap **Export module APK** and install it;
+- patch the target APK with LSPatch and select this module, or install both the target and module inside VirtualXposed;
+- the module defaults to WALK / 1.35 m/s / all channels. Use **Write current config** (Shizuku) or the copied ADB command to write `Settings.Global.elsewhere_sensor_config`; the module re-reads it every 2 seconds.
+
+The module was built, signed, exported and installed, then embedded with the official LSPatch v1.2 CLI into a sensor target APK. On launch, logcat showed `ELSEWHERE-XPOSED: installed hooks`; gravity and accelerometer values were rewritten. Setting `enabled=false` through `Settings.Global` restored the raw values, and enabling it again re-applied the hook. The LSPatch manager UI stalled at "Writing & signing" in this emulator, so the CLI path is the verified one. See [`docs/LSPATCH_XPOSED.md`](docs/LSPATCH_XPOSED.md).
 
 ### Route recording
 
@@ -301,7 +333,8 @@ Start a mock session, open **Motion → Route plans → Start recording**, move 
 ### Limits
 
 - No anti-cheat or mock-detection bypass. Injected locations are marked mock.
-- JDWP works only for debuggable targets. Non-debuggable production apps need root, a Gadget repackage, or a patch/virtual-space route (LSPatch / VirtualXposed) with an Xposed module; that module is not included.
+- JDWP works only for debuggable targets. Non-debuggable production apps need root, a Gadget repackage, or the LSPatch / VirtualXposed Xposed module (the target must be patched or virtualized).
+- LSPatch changes the target APK signature; VirtualXposed uses a virtual container. Both can be detected by integrity/Xposed checks.
 - No system-wide radio injection without root/system privileges.
 - Other apps' private caches cannot be cleared or backed up silently; external snapshots may not be readable by the target after write-back.
 - Frida injection is external. Shizuku cannot ptrace another UID. JDWP uses ADB's debug protocol; it does not remove the debuggable requirement.
@@ -311,10 +344,10 @@ Start a mock session, open **Motion → Route plans → Start recording**, move 
 ### Build and verification
 
 ```bash
-./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :xposed-sensor:assembleRelease
 ```
 
-19 JVM tests pass and Android Lint passes. Android 15 emulator QA covers mock injection, overlay joystick, route cruise, route recording, Frida script generation and JavaScript syntax. The exported one-click kit was validated end-to-end: app export → Windows launcher → JDWP `Library injection successful!` without root or repackaging. It was then injected into a minimal debuggable sensor target; the app logged `ELSEWHERE-SENSOR ready`, gravity became `0,0,9.81`, and accelerometer values changed over time — proving actual `SensorEvent` rewriting, not just script delivery. This test used the pinned Frida Gadget 16.7.19; Frida 17 requires bundling `frida-java-bridge`. Root/Gadget repackaging paths and physical-device matrices were not tested. LSPatch / VirtualXposed remain unsupported integrations.
+19 JVM tests pass and Android Lint passes. Android 15 emulator QA covers mock injection, overlay joystick, route cruise, route recording, Frida script generation and JavaScript syntax. The exported one-click kit was validated end-to-end: app export → Windows launcher → JDWP `Library injection successful!` without root or repackaging. It was then injected into a minimal debuggable sensor target; the app logged `ELSEWHERE-SENSOR ready`, gravity became `0,0,9.81`, and accelerometer values changed over time — proving actual `SensorEvent` rewriting, not just script delivery. This test used the pinned Frida Gadget 16.7.19; Frida 17 requires bundling `frida-java-bridge`. The Xposed module was embedded with LSPatch v1.2 CLI into the sensor target, installed, and verified to rewrite values; its global config toggle was also tested. Root/Gadget repackaging paths, VirtualXposed and physical-device matrices were not tested.
 
 See [`docs/TESTING.md`](docs/TESTING.md) and the interactive architecture at [`docs/architecture/elsewhere-architecture.html`](docs/architecture/elsewhere-architecture.html).
 

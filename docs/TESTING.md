@@ -199,9 +199,31 @@ cell_network_type=LTE
 ### 2.14 Archify 架构图
 
 - 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `ad891b93fa808c32b4c4f129e7d61a793e4bf471`。
-- 架构图包含 JDWP loader、Root frida-server、Gadget 三条注入路径，以及 LSPatch / VirtualXposed 仅文档说明的边界。
+- 架构图包含 JDWP loader、Root frida-server、Gadget 三条注入路径；LSPatch / Xposed 作为独立 patch/虚拟空间路线在模块文档中说明。
 - 最终 `finalize`：validate / deliver / check / browser-check 全部通过，无诊断。
 - 输出：[`architecture/elsewhere-architecture.html`](architecture/elsewhere-architecture.html) 和嵌入 README 的 PNG。
+
+### 2.15 LSPatch / Xposed 模块
+
+- `:xposed-sensor:assembleRelease` 成功；模块包 `com.elsewhere.location.xposed`，manifest 包含 `xposedmodule`、`xposedminversion=82`，assets 包含 `xposed_init`。
+- 模块使用 project release key 签名，打入 `他乡` assets；环境页「05 LSPatch / Xposed」→「导出模块 APK」可分享/安装，`pm install` 成功。
+- 用官方 **LSPatch v1.2 CLI** 将模块嵌入最小传感器目标 APK：
+
+  ```bash
+  java -jar lspatch.jar -m elsewhere-sensor-xposed.apk -o out sensor-target.apk
+  ```
+
+  CLI 输出 `Embedding modules: com.elsewhere.location.xposed` 和 `Done`；patched APK 安装成功。
+- 启动目标后 logcat：
+
+  ```text
+  ELSEWHERE-XPOSED: installed hooks for com.example.sensortarget process=com.example.sensortarget
+  ```
+
+  target 的传感器值被改写；重力变为 `0,0,9.81`，线性加速度从原始噪声变为时变值。
+- 通过 `adb shell settings put global elsewhere_sensor_config '{"enabled":false,...}'` 关闭后，target 收到原始值；重新开启后恢复 Hook。配置热重读链路确认。
+- LSPatch manager UI 在当前模拟器的 patch 流程卡在 “Writing & signing”；改用官方 CLI 后成功。这是环境/界面的问题，模块在 LSPatch 引擎下已实际运行。
+- VirtualXposed 容器路径尚未实测。
 
 ---
 
@@ -217,7 +239,8 @@ cell_network_type=LTE
 - 8sp 微标签在小屏/强光下的可读性需要进一步真机评估。
 - Frida Hook 的 Java 层 dispatch 行为尚未用真正注册传感器的目标联调；厂商字段差异可能让 handle 映射失效。
 - JDWP 路径只对 debuggable 目标有效；生产包仍需 Root/Gadget 或 LSPatch/VirtualXposed 等 patch/虚拟空间路线。
-- 本轮没有内置 Xposed 模块；LSPatch / VirtualXposed 只是文档中的备选思路，不是已实现能力。
+- Xposed 模块已用 LSPatch CLI 实测；LSPatch manager UI 的 “Writing & signing” 卡住未定位，VirtualXposed 容器路径也未实测。
+- 模块通过 `Settings.Global` 接收配置，需要 Shizuku 或一次 ADB 写入；普通用户无 Shizuku 时是默认配置。
 - PriviSense 是 rooted-device 研究框架，不可当作无 Root 通用方案。
 - 录制路线依赖模拟会话存活；进程被系统杀死时，尚未结束的录制会丢失。
 

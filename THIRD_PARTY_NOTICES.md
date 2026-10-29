@@ -51,7 +51,8 @@ Android、Google 是 Google LLC 的商标。高德、百度、Shizuku、OpenStre
 - **Frida** — 动态插桩工具，采用其自身的 wxWindows Library Licence / 相关许可。他乡只生成并分发自己的 JavaScript Hook 脚本；Frida 客户端、frida-server 和 Frida Gadget 由用户另行安装。此项目不包含 Frida 二进制。
 - **frida-jdwp-loader** — 第三方 MIT 许可的 JDWP 注入脚本。该脚本打包在应用 assets 中，并会随「JDWP 一键注入包」导出；许可证 [`frida-jdwp-loader.LICENSE`](app/src/main/assets/frida/frida-jdwp-loader.LICENSE) 同时包含在 ZIP 内。  
   https://github.com/frankheat/frida-jdwp-loader
-- **LSPatch / VirtualXposed / Xposed** — 未集成，也未随应用分发；它们需要 patch APK 或虚拟空间，并需要单独的 Xposed 模块。
+- **LSPatch / VirtualXposed** — 独立的免 Root patcher / 虚拟空间，未随应用分发，需用户自行安装。他乡提供自己的 Xposed 模块 APK（`com.elsewhere.location.xposed`），供其加载。
+- **Xposed API 82** — 仅用于编译模块（`compileOnly`），JAR 位于 `xposed-sensor/libs/api-82.jar`，来源 https://api.xposed.info/de/robv/android/xposed/api/82/api-82.jar；不打包进模块 APK，运行时由 LSPatch 提供。
 - **PriviSense** — ICSE 2026 Demo / arXiv:2601.22414 的研究工作，运行于 rooted Android；本项目未复制或集成其代码。  
   https://arxiv.org/abs/2601.22414
 - **Archify** — 用于生成 `docs/architecture` 中的架构图；不是应用的运行时依赖。

@@ -34,4 +34,5 @@ dist/*.idsig
 /archify-elsewhere/
 /docs/architecture/*report.json
 /docs/architecture/*.delivery.json
+/xposed-sensor/build/
 

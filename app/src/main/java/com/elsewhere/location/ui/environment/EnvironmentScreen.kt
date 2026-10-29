@@ -58,6 +58,7 @@ import com.elsewhere.location.core.WifiProfile
 import com.elsewhere.location.data.FridaInjectionMode
 import com.elsewhere.location.ui.ElsewhereViewModel
 import com.elsewhere.location.ui.FridaUiState
+import com.elsewhere.location.ui.XposedUiState
 import com.elsewhere.location.ui.components.DriftPlot
 import com.elsewhere.location.ui.components.EIcon
 import com.elsewhere.location.ui.components.Hairline
@@ -101,6 +102,8 @@ fun EnvironmentScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val session by viewModel.session.collectAsStateWithLifecycle()
     val frida by viewModel.fridaUi.collectAsStateWithLifecycle()
+    val xposed by viewModel.xposedUi.collectAsStateWithLifecycle()
+    val shizuku by viewModel.shizukuStatus.collectAsStateWithLifecycle()
     val environment = settings.environment
     val drift = settings.drift
     val context = LocalContext.current
@@ -626,6 +629,30 @@ fun EnvironmentScreen(
                 onCopy = copyText,
             )
 
+            Spacer(Modifier.height(18.dp))
+            SectionRule(
+                index = "05",
+                title = "LSPatch / Xposed",
+                english = "rootless sensor module",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                trailing = {
+                    Text(
+                        "PATCH / VIRTUAL",
+                        style = MonoTiny.copy(fontSize = 8.sp),
+                        color = Signal,
+                    )
+                },
+            )
+            LSPatchXposedSection(
+                xposed = xposed,
+                shizukuReady = shizuku.ready,
+                onExportModule = viewModel::exportXposedModule,
+                onWriteConfig = viewModel::writeXposedConfig,
+                onCopyAdb = {
+                    copyText("ADB Xposed 配置命令", viewModel.xposedAdbCommand())
+                },
+            )
+
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -720,6 +747,107 @@ private fun EnvironmentSourceBlock(
                 content()
             }
         }
+    }
+}
+
+@Composable
+private fun LSPatchXposedSection(
+    xposed: XposedUiState,
+    shizukuReady: Boolean,
+    onExportModule: () -> Unit,
+    onWriteConfig: () -> Unit,
+    onCopyAdb: () -> Unit,
+) {
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        NoticeBlock(
+            text = "Xposed 模块不能注入未修改的 App。LSPatch 需要把模块嵌入 patched APK；VirtualXposed 需要把目标和模块放进虚拟空间。两条路线都不需要 Root，但会改变签名或运行环境。",
+            title = "需要 patch 或虚拟空间",
+            tone = StatusTone.Warning,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TinyActionChip(
+                text = if (xposed.exporting) "导出中…" else "导出模块 APK",
+                onClick = onExportModule,
+                selected = true,
+                icon = EIcon.External,
+                enabled = !xposed.exporting,
+            )
+            Spacer(Modifier.width(7.dp))
+            TinyActionChip(
+                text = if (xposed.writingConfig) "写入中…" else "写入当前配置",
+                onClick = onWriteConfig,
+                icon = EIcon.Sensors,
+                enabled = !xposed.writingConfig,
+            )
+            Spacer(Modifier.width(7.dp))
+            TinyActionChip(
+                text = "复制 ADB 配置",
+                onClick = onCopyAdb,
+                icon = EIcon.Shield,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(PaperHigh)
+                .border(1.dp, Line, RoundedCornerShape(2.dp))
+                .padding(horizontal = 12.dp, vertical = 5.dp),
+        ) {
+            FridaStatusRow(label = "MODULE", value = "BUNDLED · XPOSED 82", color = Ink)
+            FridaStatusRow(
+                label = "ROUTE",
+                value = "LSPATCH / VIRTUALXPOSED",
+                color = Ink,
+            )
+            FridaStatusRow(
+                label = "CONFIG",
+                value = "GLOBAL · elsewhere_sensor_config",
+                color = Muted,
+            )
+            FridaStatusRow(
+                label = "SHIZUKU",
+                value = if (shizukuReady) "READY" else "LIMITED",
+                color = if (shizukuReady) Green else Amber,
+            )
+        }
+        if (xposed.error != null) {
+            Spacer(Modifier.height(7.dp))
+            Text(xposed.error, style = MonoTiny.copy(fontSize = 8.sp), color = Amber)
+        }
+        if (xposed.notice != null) {
+            Spacer(Modifier.height(7.dp))
+            Text(xposed.notice, style = MonoTiny.copy(fontSize = 8.sp), color = Muted)
+        }
+        if (xposed.modulePath != null) {
+            Spacer(Modifier.height(5.dp))
+            Text(
+                "APK  ${xposed.modulePath}",
+                style = MonoTiny.copy(fontSize = 7.sp),
+                color = Faint,
+            )
+        }
+        Spacer(Modifier.height(9.dp))
+        Text(
+            "使用顺序",
+            style = MonoLabel.copy(fontSize = 8.sp),
+            color = Signal,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "1. 安装导出的模块 APK。\n" +
+                "2. 用 LSPatch 选择目标 APK 并勾选本模块，patch 后安装；或把目标与模块都放进 VirtualXposed。\n" +
+                "3. 启动目标；模块默认 WALK/1.35 m/s/全部通道。用「写入当前配置」同步当前模式，或复制 ADB 命令。",
+            style = MaterialTheme.typography.bodySmall,
+            color = Muted,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "配置键为 Settings.Global.elsewhere_sensor_config；模块每 2 秒重读。未写入时使用默认配置。",
+            style = MonoTiny.copy(fontSize = 8.sp),
+            color = Faint,
+        )
     }
 }
 

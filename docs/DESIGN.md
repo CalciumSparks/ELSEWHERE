@@ -235,7 +235,7 @@ Frida 是一个**外部注入**能力，界面不能把它画成普通的“已�
 - JDWP 结果面板提供「导出 / 分享一键注入包」，把脚本、MIT loader、目标包名、固定 Frida 16.7.19 版本和 Windows/macOS/Linux 启动脚本打包；分享面板负责把它送到电脑；
 - 说明 Shizuku 没有 ptrace 权限；JDWP 免 Root 只对 debuggable 目标有效，外部 loader 才是执行者。
 
-LSPatch / VirtualXposed 只在说明文字中出现，表示“需要 patch/虚拟空间 + Xposed 模块”的另一类路线；当前不把它们画成已实现能力。
+LSPatch / VirtualXposed 以独立的「05 LSPatch / Xposed」卡片出现：导出模块 APK、写入/复制全局配置、说明 patch/虚拟空间边界。架构图仍以 Frida 路径为主，模块作为另一条部署路线在文档中说明。
 
 这是把“诚实边界”延伸到新功能：可以做脚本生成、目标检测、部署和命令导出，但不能把“脚本已生成”写成“Hook 已生效”。
 

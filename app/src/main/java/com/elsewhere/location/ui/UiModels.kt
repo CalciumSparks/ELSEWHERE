@@ -139,6 +139,14 @@ data class FridaUiState(
     val notice: String? = null,
 )
 
+data class XposedUiState(
+    val exporting: Boolean = false,
+    val writingConfig: Boolean = false,
+    val modulePath: String? = null,
+    val notice: String? = null,
+    val error: String? = null,
+)
+
 data class DiagnosticsUiState(
     val loading: Boolean = false,
     val report: SystemReport? = null,
