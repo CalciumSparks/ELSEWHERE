@@ -1,7 +1,4 @@
-SHA-256
-
-1d7e1f7a7fa15ac4be5a2dcbfef231434f20383c10d77807c2daa7c0dea256d5  elsewhere-1.0.0.apk
-b47167c0fee545099648b311fd481d46ea054a4f68de4c4d8ff88e302a27008c  elsewhere-1.0.0-dev.apk
-
-Release signer SHA-256:
-27780366d4d1a041c0eb99b8b99bfafb9374de4d35af4ed840e422f2598349d0
+-----BEGIN SHA256-----
+652f52afe5b175790e3b6ec5c6f4ff1031bb7d4b2da0a75ff6b0e08ab8847fd2  elsewhere-1.1.0.apk
+b221918342da3824d8b029e0df730a1ea3304b7367a0833930995d5f720403b3  elsewhere-1.1.0-dev.apk
+-----END SHA256-----

@@ -9,7 +9,7 @@
     "repository": {
       "url": "git@github.com:CalciumSparks/ELSEWHERE.git",
       "link_mode": "local-only",
-      "revision": "ad891b93fa808c32b4c4f129e7d61a793e4bf471"
+      "revision": "b4352362e653465d6bf20f46e6177ca61823d185"
     }
   },
   "components": [
@@ -334,6 +334,49 @@
         180,
         60
       ]
+    },
+    {
+      "id": "lspatch",
+      "type": "external",
+      "label": "LSPatch",
+      "sublabel": "patch / VirtualXposed",
+      "tag": "no root",
+      "pos": [
+        560,
+        900
+      ],
+      "size": [
+        180,
+        60
+      ]
+    },
+    {
+      "id": "xposed_module",
+      "type": "backend",
+      "label": "Xposed Sensor Module",
+      "sublabel": "API 82 · dispatch hook",
+      "pos": [
+        790,
+        900
+      ],
+      "size": [
+        180,
+        60
+      ],
+      "sources": [
+        {
+          "path": "xposed-sensor/src/main/java/com/elsewhere/location/xposed/SensorHook.java",
+          "line": 32
+        },
+        {
+          "path": "xposed-sensor/src/main/java/com/elsewhere/location/xposed/SensorHook.java",
+          "line": 51
+        },
+        {
+          "path": "xposed-sensor/src/main/java/com/elsewhere/location/xposed/SensorHook.java",
+          "line": 100
+        }
+      ]
     }
   ],
   "boundaries": [
@@ -353,12 +396,14 @@
     },
     {
       "kind": "region",
-      "label": "EXTERNAL FRIDA RUNTIME · ROOT / GADGET / JDWP",
+      "label": "EXTERNAL RUNTIME · FRIDA / LSPATCH",
       "wraps": [
         "frida_client",
         "frida_server",
         "target_app",
-        "jdwp_loader"
+        "jdwp_loader",
+        "lspatch",
+        "xposed_module"
       ]
     }
   ],
@@ -461,6 +506,19 @@
       "to": "target_app",
       "label": "JDWP",
       "variant": "dashed"
+    },
+    {
+      "id": "lspatch-to-module",
+      "from": "lspatch",
+      "to": "xposed_module",
+      "label": "embed"
+    },
+    {
+      "id": "module-to-target",
+      "from": "xposed_module",
+      "to": "target_app",
+      "label": "hook",
+      "variant": "dashed"
     }
   ],
   "cards": [
@@ -506,6 +564,15 @@
         "LSPatch needs an Xposed module and a modified APK.",
         "VirtualXposed runs the target inside its virtual space.",
         "Neither is integrated in this build; JDWP is the no-repackaging route."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "LSPatch / Xposed",
+      "items": [
+        "Separate APK patched or virtualized target; no root.",
+        "Module hooks dispatchSensorEvent on API 82.",
+        "Global config: Settings.Global.elsewhere_sensor_config."
       ]
     }
   ]

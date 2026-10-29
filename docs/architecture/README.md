@@ -1,7 +1,7 @@
 # Architecture diagram
 
 Generated with **Archify 3.2.0** from the repository at revision
-`ad891b93fa808c32b4c4f129e7d61a793e4bf471`.
+`b4352362e653465d6bf20f46e6177ca61823d185`.
 
 - Interactive artifact: [`elsewhere-architecture.html`](elsewhere-architecture.html)
 - README image: [`elsewhere-architecture.png`](elsewhere-architecture.png)
@@ -30,5 +30,8 @@ The diagram deliberately separates:
   - **JDWP** through `frida-jdwp-loader` (no root, debuggable targets only);
   - a **root frida-server** (any target);
   - a **Frida Gadget** repackaged into the target.
-- LSPatch / VirtualXposed are patch-or-virtualize routes, not the JDWP path;
-  they are noted in the interactive cards and are not integrated as a runtime.
+- the **LSPatch / VirtualXposed** route: LSPatch patches the target and embeds
+  the `Xposed Sensor Module` (API 82), or VirtualXposed runs both in its virtual
+  space. This is a separate patch/virtualization route, not JDWP.
+- `Settings.Global.elsewhere_sensor_config` supplies the module config; the app
+  exports the module APK and writes/copies that config.

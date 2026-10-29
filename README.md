@@ -6,9 +6,9 @@
 
 [![他乡系统结构](docs/architecture/elsewhere-architecture.png)](docs/architecture/elsewhere-architecture.html)
 
-> **分支状态 / Branch status**  
-> `main` 在 `v1.0.0` 之后新增了 **路线录制**、**Frida Sensor Bridge** 与 **LSPatch / Xposed 模块**；这些尚未进入新的 GitHub Release。当前公开 APK 仍是 `v1.0.0`，如需使用新功能请从源码构建。  
-> `main` adds **route recording**, the **Frida Sensor Bridge** and an **LSPatch / Xposed module** after `v1.0.0`. The latest public APK is still `v1.0.0`; build from source to try the new work.
+> **版本 / Version:** [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0) · 2026-10-29  
+> 新增：路线录制、Frida JDWP 免 Root 一键包、LSPatch / Xposed 模块、软件内「使用指导」。  
+> Adds route recording, the Frida JDWP no-root kit, the LSPatch / Xposed module and an in-app field manual.
 
 ---
 
@@ -60,13 +60,13 @@
 
 ### 安装
 
-稳定发行版是 [`v1.0.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0)。从 Release 下载 APK：
+当前发行版是 [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0)。从 Release 下载 APK：
 
 ```bash
-adb install elsewhere-1.0.0.apk
+adb install elsewhere-1.1.0.apk
 ```
 
-要试用本分支新增的路线录制 / Frida 功能，请从 `main` 构建：
+也可以从源码构建：
 
 ```bash
 ./gradlew :app:assembleDebug
@@ -85,15 +85,38 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 没有 Shizuku 时也能使用核心模拟定位：在开发者选项 →「选择模拟位置信息应用」中选择「他乡」，授予精确位置、通知与悬浮窗权限即可。
 
-### 使用
+### 完整使用指导
 
-**选点 / 启动**：拖动地图把目标点放到准星下，点「开始模拟」；再点停止。
+> 软件内也有同一份指导：**设置 → 使用指导**。下面是带命令和排查点的 README 版本。
 
-**真实 GPS**：静止时点右侧「真实」，确认卡片内容后点「应用此点」。如果只有系统缓存，会显示「缓存定位 · N 分钟前」，不会伪装成实时 GPS。
+![内置使用指导](docs/screenshots/30-guide.png)
 
-**悬浮摇杆**：启动后自动出现。按住拖动方向，松手滑行减速；可切换走路 / 跑步 / 骑行、微调速度；`×` 收起，红色方块停止。
+#### 1. 首次启动与权限
 
-**路线录制**：
+1. 首次打开完成三步校准。
+2. 推荐安装并启动 Shizuku，在他乡内授权后点「授权 / 配置」；Shizuku 会完成模拟位置 AppOp、悬浮窗与通道检查。
+3. 没有 Shizuku 时：开发者选项 →「选择模拟位置信息应用」→ 他乡；再授予精确位置、通知、悬浮窗权限。
+4. 先看「设置 → 系统与诊断」：Shizuku、AppOp、悬浮窗、Hook 信号应是 READY / ALLOWED；LIMITED 不一定是崩溃，但对应功能会降级。
+
+#### 2. 地图 / 真实 GPS
+
+- **选点**：拖地图把目标点放到准星下，或搜索地址、输入经纬度；准星位置就是最终注入点。
+- **启动**：点「开始模拟」；前台服务开始向 GPS / Network / Fused 测试提供者写入。再点停止，测试提供者会被移除。
+- **真实 GPS**：静止时点右侧「真实」，先看坐标、地址、精度和缓存年龄；确认后「应用此点」。只有缓存时会明确显示「缓存定位 · N 分钟前」，不会伪装成实时 GPS。
+- 拖动、缩放、搜索只改待注入点，不会在后台自动开始模拟。
+
+#### 3. 悬浮摇杆
+
+启动模拟后悬浮摇杆自动出现。按住拖动方向，松手滑行减速；面板内可切换走路 / 跑步 / 骑行、微调速度；`×` 收起面板，红色方块停止会话。
+
+#### 4. 路线规划与巡航
+
+1. 地图右侧「路线」进入路线工作台。
+2. 点地图添加航点；设置模式、是否环线，并命名。
+3. 保存后可「巡航」；巡航时悬浮面板切换为环形进度，不再显示摇杆。
+4. 路线可重播、编辑、删除；环线会在终点后回到起点。
+
+#### 5. 路线录制
 
 1. 启动模拟，让坐标开始移动。
 2. 运动页 →「模拟路线」→「开始录制」。
@@ -101,7 +124,7 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 4. 点「结束并保存」生成「录制 MM-dd HH:mm」，出现在路线列表，可直接巡航或编辑。
 5. 录制采样间隔约 1 秒，忽略距离小于 1.5 m 的点；少于 5 m 不保存。模拟停止时会尝试自动保存足够长的录制。
 
-**Frida Sensor Bridge**：
+#### 6. Frida Sensor Bridge
 
 环境页 →「04 Frida 动态 Hook」，选择注入路径、填写目标包名，点「检测环境」查看目标是否 debuggable，再生成脚本。应用会把脚本写入 `Android/data/com.elsewhere.location/files/frida/`，Shizuku 可用时复制到 `/data/local/tmp`。
 
@@ -152,7 +175,7 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 
 相关研究：PriviSense（[arXiv:2601.22414](https://arxiv.org/abs/2601.22414)，ICSE 2026 Demo）展示了 Frida 多传感器欺骗，但其运行前提是 **rooted Android**；本项目只借鉴问题定义，没有集成其代码。`frida-jdwp-loader` 是 MIT 许可的第三方免 Root 注入工具。
 
-### LSPatch / VirtualXposed 模块
+#### 7. LSPatch / VirtualXposed 模块
 
 环境页 →「05 LSPatch / Xposed」提供内置的 **classic Xposed API 82** 模块：
 
@@ -165,6 +188,13 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 
 > **LSPatch 运行时已验证**：使用官方 LSPatch v1.2 CLI 把模块嵌入目标 APK，patched APK 安装后 logcat 出现 `ELSEWHERE-XPOSED: installed hooks`；重力和加速度被真实改写；通过全局配置关闭后恢复原始值，再开启后再次生效。
 
+#### 8. 应用、缓存、更新与诊断
+
+- **应用页**：搜索/筛选应用，查看可访问缓存与位置 SDK 扫描结果；缓存清理会跳到系统应用信息页，由用户手动确认。
+- **外部缓存快照**：只针对可访问的外部缓存；写回所有者为 `shell`，目标应用不保证能读取；内部私有缓存无法备份。
+- **系统与诊断**：检查 Shizuku、AppOp、悬浮窗、Hook/信号状态与电池优化；LIMITED 项会附带原因和下一步。
+- **更新检查**：只读取公开 GitHub Release，显示版本、说明和资产；不会自动下载安装。
+
 ### 缓存与限制
 
 - 缓存清理由系统应用信息页手动完成；Shizuku 无法静默清理其他应用缓存。
@@ -174,7 +204,7 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 - 无 Root 不能改变系统 Wi-Fi / 蓝牙 / 基站扫描结果。
 - 注入位置会被系统标记为 mock；不绕过反作弊或 Mock 检测。
 - 路线录制采样的是**当前模拟输出**，不是独立的真实 GPS 轨迹记录器。
-- 更新检查只读取公开 GitHub Release，不自动下载安装；本分支尚未发布新 Release。
+- 更新检查只读取公开 GitHub Release，不自动下载安装；v1.1.0 已发布。
 - PriviSense 是 rooted-device 研究框架，可作设计参考，但不是本项目的免 Root 实现。
 
 ### 构建与验证
@@ -269,7 +299,13 @@ A **classic Xposed API 82 module** is also included for LSPatch / VirtualXposed.
 
 ### Install
 
-The stable binary is [`v1.0.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0). For the new route recorder / Frida work, build `main`:
+The current release is [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0):
+
+```bash
+adb install elsewhere-1.1.0.apk
+```
+
+Or build from source:
 
 ```bash
 ./gradlew :app:assembleDebug
@@ -279,6 +315,50 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ### Shizuku setup
 
 Install and start [Shizuku](https://github.com/RikkaApps/Shizuku/releases), authorize ELSEWHERE, then tap **Authorize / Configure**. Without Shizuku, choose **ELSEWHERE** under Developer options → Select mock location app, and grant location, notification and overlay permissions.
+
+### Usage guide
+
+> The same guide is built into the app: **Settings → Guide**.
+
+![In-app field manual](docs/screenshots/30-guide.png)
+
+#### 1. First run and permissions
+
+1. Complete the three-step calibration.
+2. Install and start Shizuku, authorize ELSEWHERE, then tap **Authorize / Configure**.
+3. Without Shizuku: Developer options → Select mock location app → ELSEWHERE; grant location, notification and overlay permissions.
+4. Check **Settings → System & diagnostics** first. READY / ALLOWED is the healthy state; LIMITED means a feature degrades, not necessarily a crash.
+
+#### 2. Map and real GPS
+
+- Drag the map so the target sits under the crosshair, search an address, or type coordinates. The crosshair is the injection point.
+- Tap **Start simulation** to write GPS / Network / Fused test providers; tap stop to remove them.
+- The right-side **Real** probe shows coordinates, address, accuracy and cache age before you apply it. A cached fix is explicitly labelled; it is never presented as live GPS.
+- Panning and searching only change the pending point; they never start a session.
+
+#### 3. Joystick and routes
+
+- The system overlay joystick appears after start. Drag to move, release to coast; switch walk / run / cycle or fine-tune speed. The red square stops the session; `×` only hides the panel.
+- The map's **Route** tool adds waypoints, sets mode/loop and saves a route. Cruise mode replaces the joystick with an annular progress gauge.
+
+#### 4. Route recording
+
+Start a mock session, open **Motion → Route plans → Start recording**, move via the joystick or a saved route, then **Stop and save**. Sampling is about 1 Hz; points closer than 1.5 m are ignored and less than 5 m is not saved. A sufficiently long recording is auto-saved when the session stops. The result is a normal replayable `RoutePlan`.
+
+#### 5. Frida sensor bridge
+
+Choose JDWP, root frida-server, or Frida Gadget in **Environment → 04 Frida**. The app checks target debuggability, writes the script and can export a one-click host kit. The detailed commands are below.
+
+#### 6. LSPatch / Xposed module
+
+Open **Environment → 05 LSPatch / Xposed**, export/install the module APK, patch a target APK with LSPatch (or run target + module in VirtualXposed), then write the current config. The target must be patched or virtualized; this does not inject an unmodified app. Details below.
+
+#### 7. Apps, cache, updates and diagnostics
+
+- **Apps** scans installed apps, visible cache size and location-SDK tags; cache clearing opens the system app page for manual confirmation.
+- External cache snapshots only cover accessible external cache; write-back ownership is `shell`, and the target may not read it. Private internal cache cannot be backed up.
+- **System & diagnostics** checks Shizuku, AppOps, overlay, hook signals and battery optimisation; each LIMITED item explains the next step.
+- **Update check** reads public GitHub Releases only and never downloads/installs automatically.
 
 ### Frida Sensor Bridge
 
@@ -326,9 +406,9 @@ The app bundles a **classic Xposed API 82** module (`com.elsewhere.location.xpos
 
 The module was built, signed, exported and installed, then embedded with the official LSPatch v1.2 CLI into a sensor target APK. On launch, logcat showed `ELSEWHERE-XPOSED: installed hooks`; gravity and accelerometer values were rewritten. Setting `enabled=false` through `Settings.Global` restored the raw values, and enabling it again re-applied the hook. The LSPatch manager UI stalled at "Writing & signing" in this emulator, so the CLI path is the verified one. See [`docs/LSPATCH_XPOSED.md`](docs/LSPATCH_XPOSED.md).
 
-### Route recording
+#### Route recording detail
 
-Start a mock session, open **Motion → Route plans → Start recording**, move via the joystick or a saved route, then **Stop and save**. Points closer than 1.5 m are ignored; less than 5 m is not saved. The result is a normal route plan and can be replayed, edited or deleted.
+Start a mock session, open **Motion → Route plans → Start recording**, move via the joystick or a saved route, then **Stop and save**. Points closer to than 1.5 m are ignored; less than 5 m is not saved. The recorded result is a normal route plan and can be replayed, edited or deleted. A process kill loses an unfinished recording.
 
 ### Limits
 
@@ -339,7 +419,7 @@ Start a mock session, open **Motion → Route plans → Start recording**, move 
 - Other apps' private caches cannot be cleared or backed up silently; external snapshots may not be readable by the target after write-back.
 - Frida injection is external. Shizuku cannot ptrace another UID. JDWP uses ADB's debug protocol; it does not remove the debuggable requirement.
 - The route recorder captures the simulated output, not an independent real-GPS track.
-- The public v1.0.0 APK predates the additions on `main`.
+- Release APK v1.1.0 contains the new features; older v1.0.0 remains available for rollback.
 
 ### Build and verification
 

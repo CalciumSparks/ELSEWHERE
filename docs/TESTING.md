@@ -1,7 +1,7 @@
-# 验证记录 · 他乡 / ELSEWHERE 1.0.0
+# 验证记录 · 他乡 / ELSEWHERE 1.1.0
 
-验证时间：2026-10-28  
-验证对象：`com.elsewhere.location` 1.0.0-debug / 1.0.0-release  
+验证时间：2026-10-29  
+验证对象：`com.elsewhere.location` 1.1.0-debug / 1.1.0-release  
 验证环境：Windows 11 · JDK 21 · Gradle 8.9 · Android SDK 35  
 模拟器：`elsewhere_api35` · Android 15 · 1080×2400 · 420dpi · headless  
 Shizuku：13.6.0，服务端以 shell（UID 2000）运行
@@ -43,12 +43,13 @@ $env:ANDROID_HOME='D:\Android\sdk'
 ```powershell
 .\gradlew.bat :app:assembleRelease --no-daemon
 # zipalign + apksigner，详见 README
-apksigner verify --print-certs dist\elsewhere-1.0.0.apk
+apksigner verify --print-certs dist\elsewhere-1.1.0.apk
 ```
 
 结果：
 
-- APK 安装成功，`versionName=1.0.0`，`versionCode=1`。
+- APK 安装成功，`versionName=1.1.0`，`versionCode=2`。
+- APK SHA-256：`652f52afe5b175790e3b6ec5c6f4ff1031bb7d4b2da0a75ff6b0e08ab8847fd2`。
 - 签名证书 SHA-256：`27780366d4d1a041c0eb99b8b99bfafb9374de4d35af4ed840e422f2598349d0`。
 - `dist/SHA256SUMS.txt` 记录发行包与调试包的 SHA-256。
 
@@ -165,9 +166,9 @@ cell_network_type=LTE
 
 ### 2.11 GitHub 更新检查
 
-- 更新源已配置为 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE)，并已发布 `v1.0.0` Release（APK + SHA256SUMS 资产）。
-- 应用版本同为 `1.0.0`，检查返回 `tag_name=v1.0.0`、发布说明和 APK 资产，界面正确显示「已是最新」而不会误报更新。
-- 从 GitHub 下载的 Release APK SHA-256 与本地构建一致：`1d7e1f7a7fa15ac4be5a2dcbfef231434f20383c10d77807c2daa7c0dea256d5`。
+- 更新源已配置为 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE)，并已发布 `v1.1.0` Release（APK + SHA256SUMS 资产）。
+- 应用版本同为 `1.1.0`，检查返回 `tag_name=v1.1.0`、发布说明和 APK 资产，界面正确显示「已是最新」而不会误报更新。
+- 从 GitHub 下载的 Release APK SHA-256：`652f52afe5b175790e3b6ec5c6f4ff1031bb7d4b2da0a75ff6b0e08ab8847fd2`。
 - 无 Release / 网络异常路径此前也已验证，分别显示空状态和错误信息，不崩溃。
 - 证据：[`29-update-check.png`](screenshots/29-update-check.png)。
 
@@ -193,13 +194,13 @@ cell_network_type=LTE
 - Windows 主机上 loader 的包名校验因 CRLF 报 `Invalid package name`；vendored loader 已用 `.strip()` 修复并随一键包发布。
 - **一键包完整链路验证**：应用内点「导出 / 分享一键注入包」生成 ZIP，分享面板正常打开；adb pull 后解压得到脚本、`frida-jdwp-loader.py`、`target.txt`、`frida-version.txt`、Windows/macOS/Linux 启动脚本、MIT 许可和说明。解压后执行 `run-jdwp-windows.ps1`，脚本完成 adb/Python 检查、目标重启、JDWP handshake、Gadget 上传与 `Runtime.load`，loader 输出 `Library injection successful!` 且退出码 0。
 - 平台边界：Android App 不能充当 ADB host 或代替目标包执行 `adb forward`；一键包已经把 host 侧脚本打包完整，因此仍需要电脑/Termux 作为 ADB host。
-- Root frida-server 与 Gadget 重打包路径未做真机矩阵；LSPatch / VirtualXposed 未集成。
+- Root frida-server 与 Gadget 重打包路径未做真机矩阵；LSPatch 使用独立 Xposed 模块（2.15），VirtualXposed 尚未实测。
 - 实现与操作说明见 [`FRIDA_SENSOR_BRIDGE.md`](FRIDA_SENSOR_BRIDGE.md)。
 
 ### 2.14 Archify 架构图
 
-- 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `ad891b93fa808c32b4c4f129e7d61a793e4bf471`。
-- 架构图包含 JDWP loader、Root frida-server、Gadget 三条注入路径；LSPatch / Xposed 作为独立 patch/虚拟空间路线在模块文档中说明。
+- 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `b4352362e653465d6bf20f46e6177ca61823d185`。
+- 架构图包含 JDWP loader、Root frida-server、Gadget 三条 Frida 注入路径，以及 LSPatch → Xposed Sensor Module 的 patch/虚拟空间路线。
 - 最终 `finalize`：validate / deliver / check / browser-check 全部通过，无诊断。
 - 输出：[`architecture/elsewhere-architecture.html`](architecture/elsewhere-architecture.html) 和嵌入 README 的 PNG。
 
@@ -224,6 +225,13 @@ cell_network_type=LTE
 - 通过 `adb shell settings put global elsewhere_sensor_config '{"enabled":false,...}'` 关闭后，target 收到原始值；重新开启后恢复 Hook。配置热重读链路确认。
 - LSPatch manager UI 在当前模拟器的 patch 流程卡在 “Writing & signing”；改用官方 CLI 后成功。这是环境/界面的问题，模块在 LSPatch 引擎下已实际运行。
 - VirtualXposed 容器路径尚未实测。
+
+### 2.16 内置使用指导
+
+- 设置页新增「00 使用指导」卡片，可打开完整 `GuideScreen`；指导覆盖快速开始、真实 GPS、摇杆、路线录制、JDWP 一键包、LSPatch / Xposed 模块、缓存/更新/诊断和边界。
+- 环境页 Frida/LSPatch 区块、运动页录制卡片均提供「使用指导」入口；从指导可直接打开环境页/运动页。
+- 验证 release 1.1.0 安装后，设置 →「阅读完整指导」正常打开，标题显示 `v1.1.0`。
+- 证据：[`30-guide.png`](screenshots/30-guide.png)。
 
 ---
 
@@ -262,7 +270,7 @@ $env:ANDROID_SDK_ROOT='D:\Android\sdk'
 ```powershell
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 # 或
-adb install dist\elsewhere-1.0.0.apk
+adb install dist\elsewhere-1.1.0.apk
 ```
 
 ---
