@@ -1147,6 +1147,39 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun exportJdwpKit() {
+        val artifact = _fridaUi.value.artifact
+        if (artifact == null || artifact.injectionMode != FridaInjectionMode.JDWP) {
+            _fridaUi.update {
+                it.copy(error = "先生成 JDWP 脚本，再导出一键注入包。")
+            }
+            return
+        }
+        if (_fridaUi.value.exportingKit) return
+        _fridaUi.update { it.copy(exportingKit = true, error = null) }
+        viewModelScope.launch {
+            fridaRepository.createJdwpKit(artifact)
+                .onSuccess { file ->
+                    _fridaUi.update {
+                        it.copy(
+                            exportingKit = false,
+                            kitPath = file.absolutePath,
+                            notice = "JDWP 注入包已生成；用分享面板发送到电脑后运行启动脚本。",
+                        )
+                    }
+                    _events.tryEmit(UiEvent.ShareFile(file.absolutePath))
+                }
+                .onFailure { error ->
+                    _fridaUi.update {
+                        it.copy(
+                            exportingKit = false,
+                            error = error.message ?: "生成 JDWP 注入包失败。",
+                        )
+                    }
+                }
+        }
+    }
+
     fun applyEnvironmentPreset(preset: String) {
         val base = settings.value.environment
         val updated = when (preset) {

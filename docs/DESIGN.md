@@ -232,6 +232,7 @@ Frida 是一个**外部注入**能力，界面不能把它画成普通的“已�
 - 先放琥珀色边界说明，再放注入路径选择（JDWP / Root / Gadget）、目标包名和生成按钮；
 - 状态区把 `TARGET`（是否 debuggable）、`JDWP`、Shizuku、SU、Frida Server 分开显示；
 - 生成结果面板明确写 `FRIDA SCRIPT / READY`，而不是 `HOOK ACTIVE`；
+- JDWP 结果面板提供「导出 / 分享一键注入包」，把脚本、MIT loader、目标包名和 Windows/macOS/Linux 启动脚本打包；分享面板负责把它送到电脑；
 - 说明 Shizuku 没有 ptrace 权限；JDWP 免 Root 只对 debuggable 目标有效，外部 loader 才是执行者。
 
 LSPatch / VirtualXposed 只在说明文字中出现，表示“需要 patch/虚拟空间 + Xposed 模块”的另一类路线；当前不把它们画成已实现能力。

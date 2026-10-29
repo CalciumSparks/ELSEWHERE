@@ -186,8 +186,10 @@ cell_network_type=LTE
 - 输入 debuggable 的 `com.elsewhere.location` 后显示 `TARGET: DEBUGGABLE`、`JDWP: AVAILABLE`；生成 JDWP 脚本，命令包含 `frida-jdwp-loader.py frida -n ... -i script -l ...`。
 - 脚本可由 `adb pull` 读取，配置 target/mode/sensors 正确，`node --check` 通过。
 - **真实 JDWP 注入验证成功**：在 Android 15 x86_64 模拟器上使用 `frida-jdwp-loader` + Frida Gadget 17.24.3；loader 完成 JDWP handshake、`set-debug-app`、Gadget 上传和 `Runtime.load`，输出 `Library injection successful!`，目标重启后正常运行。全程**无 Root、无 APK 重打包**。
-- Windows 主机上 loader 的包名校验因 CRLF 报 `Invalid package name`；本地 QA 用 `.strip()` 修复后通过。这是第三方工具的 bug，已写入 Frida 文档。
+- Windows 主机上 loader 的包名校验因 CRLF 报 `Invalid package name`；vendored loader 已用 `.strip()` 修复并随一键包发布。
+- **一键包完整链路验证**：应用内点「导出 / 分享一键注入包」生成 24,383 B ZIP，分享面板正常打开；adb pull 后解压得到脚本、`frida-jdwp-loader.py`、`target.txt`、Windows/macOS/Linux 启动脚本、MIT 许可和说明。放入本机 x86_64 Gadget 后执行 `run-jdwp-windows.ps1`，脚本完成 adb/Python 检查、目标重启、JDWP handshake、Gadget 上传与 `Runtime.load`，loader 输出 `Library injection successful!` 且退出码 0。全程无 Root、无重打包。
 - QA 目标 `com.elsewhere.location` 没有注册系统 `SensorManager` 监听，因此没有观察到传感器事件；`ELSEWHERE-SENSOR` logcat 也没有 ready/事件输出。传感器 dispatch 行为仍需真正使用传感器的目标 App 联调。Root/Gadget 路径未做真实设备矩阵测试。
+- 平台边界：Android App 不能充当 ADB host 或代替目标包执行 `adb forward`；一键包已经把 host 侧脚本打包完整，因此仍需要电脑/Termux 作为 ADB host。
 - 实现与操作说明见 [`FRIDA_SENSOR_BRIDGE.md`](FRIDA_SENSOR_BRIDGE.md)。
 
 ### 2.14 Archify 架构图
@@ -250,3 +252,4 @@ adb install dist\elsewhere-1.0.0.apk
 - 应用缓存：`08-apps.png`、`09-app-detail.png`
 - 系统诊断：`07-settings.png`、`07b-settings-diagnostics.png`
 - 更新检查：`29-update-check.png`
+

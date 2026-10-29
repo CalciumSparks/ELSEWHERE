@@ -68,6 +68,16 @@
             android:enabled="true"
             android:exported="true"
             android:multiprocess="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/elsewhere_file_paths" />
+        </provider>
     </application>
 
 </manifest>

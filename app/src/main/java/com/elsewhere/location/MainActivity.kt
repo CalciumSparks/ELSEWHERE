@@ -2,6 +2,7 @@ package com.elsewhere.location
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.net.Uri
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elsewhere.location.ui.ElsewhereViewModel
@@ -38,6 +40,7 @@ import com.elsewhere.location.ui.onboarding.OnboardingScreen
 import com.elsewhere.location.ui.theme.ElsewhereTheme
 import com.elsewhere.location.ui.theme.Paper
 import kotlinx.coroutines.flow.collectLatest
+import java.io.File
 
 class MainActivity : ComponentActivity() {
 
@@ -183,6 +186,25 @@ private fun ElsewhereRoot(viewModel: ElsewhereViewModel) {
                 is UiEvent.OpenUrl -> openSettingsIntent(
                     Intent(Intent.ACTION_VIEW, Uri.parse(event.url)),
                 )
+                is UiEvent.ShareFile -> {
+                    try {
+                        val file = File(event.path)
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${BuildConfig.APPLICATION_ID}.fileprovider",
+                            file,
+                        )
+                        val share = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/zip"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            clipData = ClipData.newRawUri("ELSEWHERE JDWP kit", uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(share, "发送 JDWP 注入包"))
+                    } catch (error: Exception) {
+                        viewModel.notify(error.message ?: "无法分享注入包。")
+                    }
+                }
                 UiEvent.NavigateToMap -> Unit
                 is UiEvent.OpenAppDetails -> openSettingsIntent(
                     Intent(

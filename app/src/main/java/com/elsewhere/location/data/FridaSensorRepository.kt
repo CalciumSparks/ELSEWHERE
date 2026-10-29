@@ -11,7 +11,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 enum class FridaInjectionMode(
     val shortLabel: String,
@@ -290,6 +294,86 @@ class FridaSensorRepository(
                 targetInfo = target,
             ),
         )
+    }
+
+    /**
+     * Builds a self-contained host kit for the JDWP path. Android cannot act as
+     * an ADB host or forward JDWP for another app; the kit contains the
+     * generated script, the vendored loader, launcher scripts and a README so
+     * the host-side half is one command instead of manual assembly.
+     */
+    suspend fun createJdwpKit(artifact: FridaScriptArtifact): Result<File> =
+        withContext(Dispatchers.IO) {
+            if (artifact.injectionMode != FridaInjectionMode.JDWP) {
+                return@withContext Result.failure(
+                    IllegalStateException("只有 JDWP 路径可以生成免 Root 注入包。"),
+                )
+            }
+            val scriptFile = File(artifact.localPath)
+            if (!scriptFile.isFile) {
+                return@withContext Result.failure(
+                    IllegalStateException("注入脚本不存在，请重新生成 Hook 脚本。"),
+                )
+            }
+            val directory = context.getExternalFilesDir("frida") ?: context.filesDir
+            if (!directory.exists() && !directory.mkdirs()) {
+                return@withContext Result.failure(IllegalStateException("无法创建注入包目录。"))
+            }
+            val kit = File(directory, "elsewhere-jdwp-kit.zip")
+            try {
+                ZipOutputStream(BufferedOutputStream(FileOutputStream(kit))).use { zip ->
+                    addFileEntry(zip, "elsewhere-sensor.js", scriptFile)
+                    addTextEntry(zip, "target.txt", artifact.targetPackage + "\n")
+                    addAssetEntry(zip, "frida/frida-jdwp-loader.py", "frida-jdwp-loader.py")
+                    addAssetEntry(
+                        zip,
+                        "frida/frida-jdwp-loader.LICENSE",
+                        "LICENSE-frida-jdwp-loader.txt",
+                    )
+                    addAssetEntry(zip, "frida/JDWP-KIT-README.txt", "README.txt")
+                    addAssetEntry(zip, "frida/run-jdwp-windows.ps1", "run-jdwp-windows.ps1")
+                    addAssetEntry(zip, "frida/run-jdwp-unix.sh", "run-jdwp-unix.sh")
+                    addTextEntry(
+                        zip,
+                        "KIT-INFO.txt",
+                        buildString {
+                            appendLine("ELSEWHERE JDWP no-root kit")
+                            appendLine("target=${artifact.targetPackage}")
+                            appendLine("mode=${artifact.injectionMode.shortLabel}")
+                            appendLine("sensors=${artifact.sensorSummary}")
+                            appendLine("generated=${artifact.generatedAtEpochMs}")
+                            appendLine("targetDebuggable=${artifact.targetInfo.debuggable}")
+                            appendLine()
+                            appendLine("Requires: adb, Python 3, and a debuggable target.")
+                            appendLine("No root; no APK repackaging.")
+                        },
+                    )
+                }
+            } catch (error: Exception) {
+                kit.delete()
+                return@withContext Result.failure(
+                    IllegalStateException("生成 JDWP 注入包失败。", error),
+                )
+            }
+            Result.success(kit)
+        }
+
+    private fun addFileEntry(zip: ZipOutputStream, name: String, file: File) {
+        zip.putNextEntry(ZipEntry(name))
+        file.inputStream().use { input -> input.copyTo(zip) }
+        zip.closeEntry()
+    }
+
+    private fun addTextEntry(zip: ZipOutputStream, name: String, text: String) {
+        zip.putNextEntry(ZipEntry(name))
+        zip.write(text.toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+    }
+
+    private fun addAssetEntry(zip: ZipOutputStream, assetPath: String, name: String) {
+        zip.putNextEntry(ZipEntry(name))
+        context.assets.open(assetPath).use { input -> input.copyTo(zip) }
+        zip.closeEntry()
     }
 
     private fun shellQuote(value: String): String =

@@ -42,7 +42,50 @@ cd frida-jdwp-loader
 1. 打开 **环境 → 04 Frida 动态 Hook**。
 2. `INJECTION PATH` 选择 **JDWP**。
 3. 填入目标包名，点「检测环境」。状态行会显示目标是否 installed / debuggable。
-4. 点「生成 Hook 脚本」，从结果面板复制命令。
+4. 点「生成 Hook 脚本」，从结果面板复制命令；或点 **「导出 / 分享一键注入包」**。
+
+### 一键注入包
+
+应用导出 `elsewhere-jdwp-kit.zip`，并打开 Android 分享面板。ZIP 内容：
+
+```text
+elsewhere-sensor.js          生成的 Hook 脚本（含当前模式、速度、传感器配置）
+frida-jdwp-loader.py         vendored MIT loader，已修 Windows CRLF 包名校验
+frida-jdwp-loader.LICENSE    MIT 许可
+run-jdwp-windows.ps1         Windows 启动脚本
+run-jdwp-unix.sh             macOS / Linux 启动脚本
+target.txt                   目标包名
+README.txt                   使用说明
+KIT-INFO.txt                 生成信息与目标 debuggable 状态
+```
+
+电脑端：
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File .\run-jdwp-windows.ps1
+```
+
+```bash
+# macOS / Linux
+chmod +x run-jdwp-unix.sh
+./run-jdwp-unix.sh
+```
+
+启动脚本会检查 adb/Python 3，读取 target.txt，并在目录中存在 `frida-gadget-*.so` 时自动传 `-g`；否则由 loader 下载对应 ABI 的 Gadget。
+
+> Android 应用无法充当 ADB host，也不能替另一个 UID 创建 `adb forward`。因此“完整集成”的边界是：他乡负责生成、打包、目标检查和分享；实际 JDWP 连接必须由电脑或 Termux 上的 ADB 完成。这个边界不是 UI 偷懒，而是 JDWP/adb 传输层的平台约束。
+
+### 实测：应用导出 → 电脑启动 → 注入成功
+
+在 Android 15 x86_64 模拟器、无 Root、目标为 debuggable 的 `com.elsewhere.location`：
+
+1. 应用生成脚本并导出 ZIP（24,383 B）。
+2. 解压 ZIP，放入本机 x86_64 Gadget，运行 `run-jdwp-windows.ps1`。
+3. 启动脚本完成 adb/Python 检查、目标重启、JDWP handshake、Gadget 上传和 `Runtime.load`。
+4. loader 输出 `Library injection successful!`，退出码 0。
+
+目标 App 本身不注册系统传感器监听，因此仍没有实际传感器事件可供观察；`ELSEWHERE-SENSOR` logcat 也没有 ready 日志。传感器 dispatch 的最终行为需要在真正使用 `SensorManager` 的目标上验证。
 
 ### 电脑端命令
 
@@ -88,7 +131,7 @@ Unexpected error: Invalid package name: com.example.target
 if line.removeprefix("package:").strip() == self.package_name:
 ```
 
-本项目不分发 loader；上述修改仅作为使用说明。
+一键包中的 `frida-jdwp-loader.py` 已经包含该修正；只有手工使用外部 loader 时才需要自行处理。
 
 ---
 

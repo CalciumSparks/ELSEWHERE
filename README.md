@@ -112,7 +112,22 @@ adb pull '<脚本路径>' ./elsewhere-sensor.js
 python frida-jdwp-loader.py frida -n <目标包名> -i script -l ./elsewhere-sensor.js
 ```
 
-loader 会自动下载对应 ABI 的 Frida Gadget，通过 JDWP 注入。日志：`adb logcat -s ELSEWHERE-SENSOR:*`。Windows 上如果 loader 报 `Invalid package name`，是它的 CRLF 包名校验问题；使用 WSL 或给比较加 `.strip()`，详见专门文档。
+loader 会自动下载对应 ABI 的 Frida Gadget，通过 JDWP 注入。日志：`adb logcat -s ELSEWHERE-SENSOR:*`。Windows 上如果 loader 报 `Invalid package name`，是它的 CRLF 包名校验问题；一键包内已附带修正版，手工使用外部 loader 时可用 WSL 或给比较加 `.strip()`。
+
+**不想手工拼命令？** 生成 JDWP 脚本后，点结果面板里的「导出 / 分享一键注入包」。ZIP 会自动包含：
+
+```text
+elsewhere-sensor.js         已注入当前模式/速度/传感器配置
+frida-jdwp-loader.py        MIT 许可，已修复 Windows CRLF 包名校验
+run-jdwp-windows.ps1        Windows 启动脚本
+run-jdwp-unix.sh            macOS / Linux 启动脚本
+target.txt                  目标包名
+README.txt / LICENSE        使用说明与第三方许可
+```
+
+把 ZIP 发到电脑，解压后运行 `run-jdwp-windows.ps1`（或 `./run-jdwp-unix.sh`）即可。首次运行需要联网让 loader 下载匹配 ABI 的 Gadget；也可以把 `frida-gadget-*.so` 放进 ZIP 解压目录，启动脚本会自动 `-g` 使用它。
+
+> Android App 本身不能充当 ADB host，也不能替另一个 App 创建 `adb forward`。因此“完整集成”到设备端的边界是：他乡生成可执行的一键包，注入动作仍由电脑/终端上的 ADB + loader 完成；无需 Root，无需重打包。我们实测了从应用导出 ZIP → 解压 → Windows 启动脚本 → JDWP 注入成功的完整链路。
 
 **B. Root frida-server（任意目标）**
 
@@ -155,7 +170,7 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 - 19 个 JVM 单元测试通过：Geo、ChineseGeo、MotionEngine、RouteRecorder、更新版本比较、设置序列化。
 - `lintDebug` 通过。
 - 已在 Android 15 模拟器（1080×2400）验证三路 mock 注入、悬浮摇杆、路线巡航、路线录制保存，以及 Frida 脚本生成和 `node --check` 语法检查。
-- **JDWP 已验证到原生注入层**：`frida-jdwp-loader` 成功通过 JDWP 把对应 ABI 的 Gadget 载入 debuggable 的 `com.elsewhere.location`，无 Root、无重打包；目标重启后正常运行。
+- **JDWP 一键包已验证到原生注入层**：应用内导出 24 KB ZIP → 解压 → Windows 启动脚本 → `frida-jdwp-loader` 通过 JDWP 把对应 ABI 的 Gadget 载入 debuggable 的 `com.elsewhere.location`；无 Root、无重打包，目标重启后正常运行，loader 输出 `Library injection successful!`。
 - 由于该 QA 目标没有注册系统传感器监听，尚未观察到实际传感器事件改写；脚本的 dispatch 行为仍需在真正使用 `SensorManager` 的目标上联调。Root/Gadget 路径同样未做真实设备矩阵测试。
 
 完整验证记录：[`docs/TESTING.md`](docs/TESTING.md)。
@@ -254,7 +269,11 @@ adb pull '<script path>' ./elsewhere-sensor.js
 python frida-jdwp-loader.py frida -n <target.package> -i script -l ./elsewhere-sensor.js
 ```
 
-The loader auto-downloads the matching Frida Gadget and injects it over JDWP. Inspect `adb logcat -s ELSEWHERE-SENSOR:*`. On Windows, an `Invalid package name` error is a known CRLF package-check bug in the loader; use WSL or add `.strip()` (see the detailed document).
+The loader auto-downloads the matching Frida Gadget and injects it over JDWP. Inspect `adb logcat -s ELSEWHERE-SENSOR:*`. On Windows, an `Invalid package name` error is a known CRLF package-check bug in the external loader; the exported kit already includes a patched copy (or use WSL).
+
+**One-click kit:** after generating a JDWP artifact, tap **Export / share one-click kit**. The ZIP contains the generated script, the MIT-licensed patched loader, Windows and macOS/Linux launchers, `target.txt`, a README and the loader license. Send it to a computer and run `run-jdwp-windows.ps1` or `./run-jdwp-unix.sh`. First run needs network for the Gadget, unless you put `frida-gadget-*.so` next to the launcher (it will pass `-g` automatically).
+
+An Android app cannot act as an ADB host or create `adb forward` for another package. The integrated kit assembles the host half; the actual JDWP injection still needs a computer/Termux ADB endpoint. No root and no APK repackaging. This exact path was tested end-to-end from the app export to `Library injection successful!`.
 
 **B. Root frida-server (any app)**
 
@@ -293,7 +312,7 @@ Start a mock session, open **Motion → Route plans → Start recording**, move 
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-19 JVM tests pass and Android Lint passes. Android 15 emulator QA covers mock injection, overlay joystick, route cruise, route recording, Frida script generation and JavaScript syntax. The JDWP path was additionally validated end-to-end to **native Gadget injection** into a debuggable `com.elsewhere.location` without root or repackaging; the app restarted and ran. That target did not register system sensors, so actual sensor-value rewriting still needs a sensor-using target. Root frida-server and Gadget paths have not been tested on physical hardware.
+19 JVM tests pass and Android Lint passes. Android 15 emulator QA covers mock injection, overlay joystick, route cruise, route recording, Frida script generation and JavaScript syntax. The **exported one-click kit** was additionally validated end-to-end: app export (24 KB ZIP) → extract → Windows launcher → JDWP `Library injection successful!` into a debuggable `com.elsewhere.location`, without root or repackaging; the app restarted and ran. That target did not register system sensors, so actual sensor-value rewriting still needs a sensor-using target. Root frida-server and Gadget paths have not been tested on physical hardware.
 
 See [`docs/TESTING.md`](docs/TESTING.md) and the interactive architecture at [`docs/architecture/elsewhere-architecture.html`](docs/architecture/elsewhere-architecture.html).
 

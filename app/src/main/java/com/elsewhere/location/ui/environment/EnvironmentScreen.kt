@@ -622,6 +622,7 @@ fun EnvironmentScreen(
                     viewModel.setFridaTarget(fridaTargetDraft)
                     viewModel.generateFridaHook(fridaTargetDraft)
                 },
+                onExportKit = viewModel::exportJdwpKit,
                 onCopy = copyText,
             )
 
@@ -732,6 +733,7 @@ private fun FridaSensorBridgeSection(
     onCheckEnvironment: () -> Unit,
     onModeSelect: (FridaInjectionMode) -> Unit,
     onGenerate: () -> Unit,
+    onExportKit: () -> Unit,
     onCopy: (String, String) -> Unit,
 ) {
     val environment = frida.environment
@@ -965,6 +967,23 @@ private fun FridaSensorBridgeSection(
                             dark = true,
                         )
                     }
+                }
+                if (artifact.injectionMode == FridaInjectionMode.JDWP) {
+                    Spacer(Modifier.height(8.dp))
+                    TinyActionChip(
+                        text = if (frida.exportingKit) "打包中…" else "导出 / 分享一键注入包",
+                        onClick = onExportKit,
+                        selected = true,
+                        dark = true,
+                        icon = EIcon.External,
+                        enabled = !frida.exportingKit,
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        "ZIP 内含脚本、frida-jdwp-loader、Windows 与 macOS/Linux 启动脚本；电脑上执行一条命令。",
+                        style = MonoTiny.copy(fontSize = 7.sp),
+                        color = Paper.copy(alpha = 0.5f),
+                    )
                 }
                 if (artifact.note.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))

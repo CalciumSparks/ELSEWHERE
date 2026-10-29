@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <external-files-path
+        name="frida_external"
+        path="frida/" />
+    <files-path
+        name="frida_internal"
+        path="frida/" />
+</paths>

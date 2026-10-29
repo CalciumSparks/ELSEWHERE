@@ -133,6 +133,8 @@ data class FridaUiState(
     val injectionMode: FridaInjectionMode = FridaInjectionMode.JDWP,
     val generating: Boolean = false,
     val artifact: FridaScriptArtifact? = null,
+    val exportingKit: Boolean = false,
+    val kitPath: String? = null,
     val error: String? = null,
     val notice: String? = null,
 )
@@ -162,6 +164,7 @@ sealed interface UiEvent {
     data object OpenNotificationSettings : UiEvent
     data object OpenBatteryOptimizationSettings : UiEvent
     data class OpenUrl(val url: String) : UiEvent
+    data class ShareFile(val path: String) : UiEvent
     data object NavigateToMap : UiEvent
     data class OpenAppDetails(val packageName: String) : UiEvent
 }
