@@ -55,6 +55,7 @@ import com.elsewhere.location.core.DriftConfig
 import com.elsewhere.location.core.DriftTempo
 import com.elsewhere.location.core.EnvironmentProfile
 import com.elsewhere.location.core.WifiProfile
+import com.elsewhere.location.data.FridaInjectionMode
 import com.elsewhere.location.ui.ElsewhereViewModel
 import com.elsewhere.location.ui.FridaUiState
 import com.elsewhere.location.ui.components.DriftPlot
@@ -615,7 +616,8 @@ fun EnvironmentScreen(
                 modeLabel = "${settings.motionMode.title} · %.1f m/s".format(
                     settings.speeds.forMode(settings.motionMode),
                 ),
-                onCheckEnvironment = viewModel::refreshFridaEnvironment,
+                onCheckEnvironment = { viewModel.refreshFridaEnvironment(fridaTargetDraft) },
+                onModeSelect = viewModel::setFridaInjectionMode,
                 onGenerate = {
                     viewModel.setFridaTarget(fridaTargetDraft)
                     viewModel.generateFridaHook(fridaTargetDraft)
@@ -728,16 +730,41 @@ private fun FridaSensorBridgeSection(
     sensorSummary: String,
     modeLabel: String,
     onCheckEnvironment: () -> Unit,
+    onModeSelect: (FridaInjectionMode) -> Unit,
     onGenerate: () -> Unit,
     onCopy: (String, String) -> Unit,
 ) {
     val environment = frida.environment
     val checked = environment?.checked == true
+    val target = frida.targetInfo?.takeIf { it.packageName == targetDraft.trim() }
+    val jdwpAvailable = target?.debuggable == true ||
+        (checked && environment?.debuggable == true)
     Column(Modifier.padding(horizontal = 16.dp)) {
         NoticeBlock(
-            text = "Frida 需要外部注入环境：Root + frida-server，或把 Frida Gadget 打进目标 APK。Shizuku 只负责生成 / 部署脚本，不能跨进程 ptrace。",
-            title = "外部注入 / 不是无 Root 自动 Hook",
+            text = when (frida.injectionMode) {
+                FridaInjectionMode.JDWP ->
+                    "JDWP 免 Root：仅限 debuggable App。frida-jdwp-loader 通过 ADB + JDWP 注入 frida-gadget，无需 Root、不重打包；生产包通常不可调试。"
+                FridaInjectionMode.ROOT_SERVER ->
+                    "Root 路径：需要设备上的 frida-server 运行，能覆盖任意目标 App；Shizuku 不提供 ptrace 权限。"
+                FridaInjectionMode.GADGET ->
+                    "Gadget 路径：需要把 Frida Gadget 打包进目标 APK 并重新签名；无 Root，但目标会被改写。"
+            },
+            title = "外部注入 / 三条不同信任级的路径",
             tone = StatusTone.Warning,
+        )
+        Spacer(Modifier.height(10.dp))
+        Text("INJECTION PATH", style = MonoLabel.copy(fontSize = 8.sp), color = Muted)
+        Spacer(Modifier.height(5.dp))
+        SurveySegmentedControl(
+            options = FridaInjectionMode.entries.map { it to it.shortLabel },
+            selected = frida.injectionMode,
+            onSelect = onModeSelect,
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            frida.injectionMode.detail,
+            style = MonoTiny.copy(fontSize = 8.sp),
+            color = Muted,
         )
         Spacer(Modifier.height(10.dp))
         SurveyTextField(
@@ -774,6 +801,33 @@ private fun FridaSensorBridgeSection(
                 .border(1.dp, Line, RoundedCornerShape(2.dp))
                 .padding(horizontal = 12.dp, vertical = 5.dp),
         ) {
+            FridaStatusRow(
+                label = "TARGET",
+                value = when {
+                    target == null -> "NOT CHECKED"
+                    !target.installed -> "NOT INSTALLED"
+                    target.debuggable -> "DEBUGGABLE"
+                    else -> "NOT DEBUGGABLE"
+                },
+                color = when {
+                    target == null -> Faint
+                    target.debuggable -> Green
+                    else -> Amber
+                },
+            )
+            FridaStatusRow(
+                label = "JDWP",
+                value = when {
+                    target == null && !checked -> "—"
+                    jdwpAvailable -> "AVAILABLE"
+                    else -> "NO"
+                },
+                color = when {
+                    target == null && !checked -> Faint
+                    jdwpAvailable -> Green
+                    else -> Amber
+                },
+            )
             FridaStatusRow(
                 label = "SHIZUKU",
                 value = when {
@@ -815,6 +869,19 @@ private fun FridaSensorBridgeSection(
             )
             FridaStatusRow(label = "HOOK MODE", value = modeLabel, color = Ink)
         }
+        if (frida.injectionMode == FridaInjectionMode.JDWP &&
+            target != null &&
+            target.installed &&
+            !target.debuggable &&
+            !jdwpAvailable
+        ) {
+            Spacer(Modifier.height(7.dp))
+            Text(
+                "该目标未标记 debuggable；JDWP 不会生效。请改用 Root/Gadget、调试版目标，或在 ro.debuggable=1 的模拟器上测试。",
+                style = MonoTiny.copy(fontSize = 8.sp),
+                color = Amber,
+            )
+        }
         if (frida.error != null) {
             Spacer(Modifier.height(7.dp))
             Text(frida.error, style = MonoTiny.copy(fontSize = 8.sp), color = Amber)
@@ -836,13 +903,26 @@ private fun FridaSensorBridgeSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("FRIDA SCRIPT / READY", style = MonoLabel.copy(fontSize = 8.sp), color = Live)
                     Spacer(Modifier.weight(1f))
-                    Text("EXTERNAL", style = MonoTiny.copy(fontSize = 7.sp), color = Paper.copy(alpha = 0.38f))
+                    Text(
+                        artifact.injectionMode.shortLabel,
+                        style = MonoTiny.copy(fontSize = 7.sp),
+                        color = Paper.copy(alpha = 0.38f),
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "TARGET  ${artifact.targetPackage}",
                     style = MonoTiny.copy(fontSize = 8.sp),
                     color = Paper.copy(alpha = 0.75f),
+                )
+                Text(
+                    "DEBUG  ${if (artifact.targetInfo.debuggable) "YES" else "NO"}",
+                    style = MonoTiny.copy(fontSize = 8.sp),
+                    color = if (artifact.targetInfo.debuggable) {
+                        Live.copy(alpha = 0.85f)
+                    } else {
+                        Amber
+                    },
                 )
                 Text(
                     "CHANNELS  $sensorSummary",
@@ -877,12 +957,14 @@ private fun FridaSensorBridgeSection(
                         dark = true,
                         icon = EIcon.External,
                     )
-                    Spacer(Modifier.width(7.dp))
-                    TinyActionChip(
-                        text = "复制设备命令",
-                        onClick = { onCopy("Frida device command", artifact.deviceCommand) },
-                        dark = true,
-                    )
+                    if (artifact.deviceCommand.isNotBlank()) {
+                        Spacer(Modifier.width(7.dp))
+                        TinyActionChip(
+                            text = "复制设备命令",
+                            onClick = { onCopy("Frida device command", artifact.deviceCommand) },
+                            dark = true,
+                        )
+                    }
                 }
                 if (artifact.note.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
@@ -892,7 +974,7 @@ private fun FridaSensorBridgeSection(
         }
         Spacer(Modifier.height(7.dp))
         Text(
-            "传感器 Hook 只在目标进程内生效；目标 App 仍需运行并注册对应 SensorEventListener。没有外部 Frida 客户端时，本节只生成脚本。",
+            "JDWP 只对 debuggable 目标有效；Root/Gadget 覆盖其他目标。LSPatch / VirtualXposed 需要重打包或虚拟空间，不是本节的无重打包 JDWP 路径。",
             style = MonoTiny.copy(fontSize = 8.sp),
             color = Faint,
         )

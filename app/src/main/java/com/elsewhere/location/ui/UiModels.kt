@@ -8,7 +8,9 @@ import com.elsewhere.location.core.SavedPlace
 import com.elsewhere.location.core.SystemReport
 import com.elsewhere.location.core.UpdateInfo
 import com.elsewhere.location.data.FridaEnvironment
+import com.elsewhere.location.data.FridaInjectionMode
 import com.elsewhere.location.data.FridaScriptArtifact
+import com.elsewhere.location.data.FridaTargetInfo
 import com.elsewhere.location.data.TargetAppInfo
 
 sealed interface MapCommand {
@@ -127,6 +129,8 @@ data class FridaUiState(
     val targetPackage: String = "",
     val checkingEnvironment: Boolean = false,
     val environment: FridaEnvironment? = null,
+    val targetInfo: FridaTargetInfo? = null,
+    val injectionMode: FridaInjectionMode = FridaInjectionMode.JDWP,
     val generating: Boolean = false,
     val artifact: FridaScriptArtifact? = null,
     val error: String? = null,

@@ -27,6 +27,7 @@ import com.elsewhere.location.core.SavedPlace
 import com.elsewhere.location.core.SensorConfig
 import com.elsewhere.location.core.SessionStartConfig
 import com.elsewhere.location.core.SpeedSettings
+import com.elsewhere.location.data.FridaInjectionMode
 import com.elsewhere.location.data.TargetAppInfo
 import com.elsewhere.location.data.TargetAppRepository
 import com.elsewhere.location.service.MockLocationService
@@ -1037,6 +1038,7 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
         _fridaUi.update {
             it.copy(
                 targetPackage = clean,
+                targetInfo = null,
                 artifact = null,
                 notice = null,
                 error = null,
@@ -1044,28 +1046,38 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun refreshFridaEnvironment() {
+    fun setFridaInjectionMode(mode: FridaInjectionMode) {
+        _fridaUi.update {
+            it.copy(
+                injectionMode = mode,
+                artifact = null,
+                notice = null,
+                error = null,
+            )
+        }
+    }
+
+    fun refreshFridaEnvironment(targetOverride: String? = null) {
         if (_fridaUi.value.checkingEnvironment) return
+        val target = (targetOverride ?: _fridaUi.value.targetPackage).trim()
         _fridaUi.update { it.copy(checkingEnvironment = true, error = null) }
         viewModelScope.launch {
-            fridaRepository.inspectEnvironment()
-                .onSuccess { environment ->
-                    _fridaUi.update {
-                        it.copy(
-                            checkingEnvironment = false,
-                            environment = environment,
-                            error = null,
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    _fridaUi.update {
-                        it.copy(
-                            checkingEnvironment = false,
-                            error = error.message ?: "无法读取 Frida 环境。",
-                        )
-                    }
-                }
+            val environment = fridaRepository.inspectEnvironment()
+            val targetInfo = if (shizuku.isSafePackageName(target)) {
+                fridaRepository.inspectTarget(target)
+            } else {
+                null
+            }
+            _fridaUi.update {
+                it.copy(
+                    checkingEnvironment = false,
+                    environment = environment.getOrNull() ?: it.environment,
+                    targetInfo = targetInfo?.getOrNull()
+                        ?: it.targetInfo?.takeIf { info -> info.packageName == target },
+                    error = environment.exceptionOrNull()?.message
+                        ?: targetInfo?.exceptionOrNull()?.message,
+                )
+            }
         }
     }
 
@@ -1083,6 +1095,9 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         mutateSettings { it.copy(fridaTargetPackage = target) }
+        val injectionMode = _fridaUi.value.injectionMode
+        val cachedTarget = _fridaUi.value.targetInfo
+            ?.takeIf { it.packageName == target }
         _fridaUi.update {
             it.copy(
                 targetPackage = target,
@@ -1101,16 +1116,22 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
                 mode = mode,
                 speedMps = speed,
                 sensors = current.sensors,
+                injectionMode = injectionMode,
+                targetInfo = cachedTarget,
+                deviceDebuggable = _fridaUi.value.environment?.debuggable == true,
             ).onSuccess { artifact ->
                 _fridaUi.update {
                     it.copy(
                         generating = false,
                         artifact = artifact,
-                        notice = when {
-                            artifact.deployedPath != null ->
-                                "脚本已部署到设备的 /data/local/tmp。将脚本拉到电脑后，在外部运行 Frida。"
-                            artifact.note.isNotBlank() -> artifact.note
-                            else -> "脚本已生成。将脚本拉到电脑后，在外部运行 Frida。"
+                        targetInfo = artifact.targetInfo,
+                        notice = when (injectionMode) {
+                            FridaInjectionMode.JDWP ->
+                                "JDWP 免 Root 脚本已生成；仅对 debuggable 目标有效。"
+                            FridaInjectionMode.ROOT_SERVER ->
+                                "Root 路径脚本已生成；需要设备的 frida-server 正在运行。"
+                            FridaInjectionMode.GADGET ->
+                                "Gadget 路径脚本已生成；目标 APK 需要已包含 Frida Gadget。"
                         },
                     )
                 }

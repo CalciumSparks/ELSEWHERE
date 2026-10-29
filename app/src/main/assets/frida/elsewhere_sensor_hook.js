@@ -1,8 +1,10 @@
 /*
  * ELSEWHERE — Frida sensor bridge
  *
- * This script is injected into a target process by an external Frida client
- * (frida-server on a rooted device, or a Frida Gadget build of the target).
+ * This script is injected into a target process by an external Frida client:
+ * - frida-jdwp-loader over JDWP for a debuggable app (no root, no repackaging);
+ * - a root frida-server (any app);
+ * - a Frida Gadget build of the target (repackaged).
  * It intercepts SystemSensorManager dispatches and rewrites the values that
  * the target's SensorEventListeners receive.
  *
@@ -38,8 +40,35 @@ const handles = {};
 const warnedHandles = {};
 const startedAtMs = Date.now();
 let generatedSteps = 0;
-let lastStepSecond = -1;
 let eventCount = 0;
+const LOG_TAG = 'ELSEWHERE-SENSOR';
+
+function log(message) {
+    try {
+        const Log = Java.use('android.util.Log');
+        Log.i(LOG_TAG, String(message));
+    } catch (ignored) {
+        // The Java bridge may not be available before boot; console is a
+        // useful fallback when a Frida CLI is attached.
+    }
+    try {
+        console.log('[elsewhere] ' + message);
+    } catch (ignored) {
+        // In frida-jdwp-loader script mode, logcat is the usable output.
+    }
+}
+
+function emit(event, payload) {
+    const message = Object.assign({ event: event }, payload || {});
+    try {
+        send(message);
+    } catch (ignored) {
+        // Autonomous JDWP/Gadget modes have no attached message handler.
+    }
+    if (event === 'ready' || event === 'error' || event === 'unmapped-sensor') {
+        log(JSON.stringify(message));
+    }
+}
 
 function sensorEnabled(type) {
     const key = SENSOR_KEY[type];
@@ -66,8 +95,7 @@ function phase() {
 function warnOnce(handle, values) {
     if (warnedHandles[handle]) return;
     warnedHandles[handle] = true;
-    send({
-        event: 'unmapped-sensor',
+    emit('unmapped-sensor', {
         handle: handle,
         valueCount: values.length,
         note: 'Could not resolve the Sensor type for this handle; values were left untouched.'
@@ -207,7 +235,7 @@ function hookDispatch(SystemSensorManager) {
     const Queue = Java.use('android.hardware.SystemSensorManager$SensorEventQueue');
     const method = Queue.dispatchSensorEvent;
     if (!method || !method.overloads) {
-        send({ event: 'error', message: 'dispatchSensorEvent has no overloads' });
+        emit('error', { message: 'dispatchSensorEvent has no overloads' });
         return;
     }
     method.overloads.forEach(function (overload) {
@@ -234,7 +262,9 @@ function hookDispatch(SystemSensorManager) {
 
 function boot() {
     if (!Java.available) {
-        send({ event: 'error', message: 'Java bridge is unavailable' });
+        // frida-jdwp-loader can load the Gadget during early app startup, before
+        // the Java bridge is ready. Wait instead of failing the whole script.
+        setTimeout(boot, 200);
         return;
     }
     Java.perform(function () {
@@ -242,8 +272,7 @@ function boot() {
             const SystemSensorManager = Java.use('android.hardware.SystemSensorManager');
             hookRegistration(SystemSensorManager);
             hookDispatch(SystemSensorManager);
-            send({
-                event: 'ready',
+            emit('ready', {
                 android: Java.androidVersion,
                 process: Process.id,
                 mode: CONFIG.mode,
@@ -252,7 +281,7 @@ function boot() {
                 note: 'Sensor values are rewritten at SystemSensorManager dispatch.'
             });
         } catch (error) {
-            send({ event: 'error', message: String(error) });
+            emit('error', { message: String(error) });
         }
     });
 }
