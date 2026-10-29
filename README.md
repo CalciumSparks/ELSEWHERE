@@ -1,14 +1,14 @@
 # 他乡 / ELSEWHERE
 
-> Android 上的无 Root 位置仪。地图、准星、悬浮摇杆、路线，以及一条支持 JDWP 免 Root 的 Frida 传感器桥。
+> Android 上的无 Root 位置仪。地图、准星、悬浮摇杆、路线，以及 JDWP 免 Root Frida / LSPatch 传感器与无线环境桥。
 
 [中文](#中文) · [English](#english) · [Releases](https://github.com/CalciumSparks/ELSEWHERE/releases) · [Interactive architecture](docs/architecture/elsewhere-architecture.html)
 
 [![他乡系统结构](docs/architecture/elsewhere-architecture.png)](docs/architecture/elsewhere-architecture.html)
 
-> **版本 / Version:** [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0) · 2026-10-29  
-> 新增：路线录制、Frida JDWP 免 Root 一键包、LSPatch / Xposed 模块、软件内「使用指导」。  
-> Adds route recording, the Frida JDWP no-root kit, the LSPatch / Xposed module and an in-app field manual.
+> **最新 Release / Latest:** [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0) · 2026-10-29  
+> **main / 1.2.0-dev:** LSPatch 模块新增虚拟无线环境（Wi-Fi / 蓝牙 / 蜂窝）；当前 release 仍为 v1.1.0。  
+> `main` adds virtual wireless environment hooks (Wi-Fi / Bluetooth / cell) to the LSPatch module in 1.2.0-dev; the latest release remains v1.1.0.
 
 ---
 
@@ -54,8 +54,8 @@
 | 路线录制 | **应用内采样** | 采样当前被注入的坐标，保存为普通 RoutePlan。 |
 | 应用内传感器 | **仅应用内推演** | 无 Root 无法把传感器流交给其他 App。 |
 | Frida 传感器 Hook | **真实 Hook 脚本（外部注入）** | JDWP 免 Root 仅限 debuggable 目标；Root/Gadget 覆盖其他目标；只影响目标进程。 |
-| LSPatch / Xposed 模块 | **真实 Hook（patch/虚拟空间）** | 目标 APK 需被 LSPatch patch，或运行在 VirtualXposed；API 82 模块。 |
-| Wi-Fi / 蓝牙 / 基站 | **Location extras** | 不改变系统无线电扫描。 |
+| LSPatch / Xposed 模块 | **真实 Hook（patch/虚拟空间）** | 目标 APK 需被 LSPatch patch，或运行在 VirtualXposed；API 82 模块，含运动传感器与无线环境。 |
+| Wi-Fi / 蓝牙 / 基站 | **extras + 目标进程 Hook** | Location extras 之外，LSPatch 模块可改写被 patch 目标的 Wi-Fi/蓝牙/蜂窝 Java API；不改系统无线电扫描。 |
 | 清理其他 App 缓存 | **系统页面手动完成** | Shizuku shell 不具备 `INTERNAL_DELETE_CACHE_FILES`。 |
 
 ### 安装
@@ -179,14 +179,20 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 
 环境页 →「05 LSPatch / Xposed」提供内置的 **classic Xposed API 82** 模块：
 
-- 模块包名：`com.elsewhere.location.xposed`；Hook `SystemSensorManager$SensorEventQueue.dispatchSensorEvent`。
+- 模块包名：`com.elsewhere.location.xposed`，版本 1.1.0；同时 Hook 运动传感器与无线环境读取。
+- 运动传感器：`SystemSensorManager$SensorEventQueue.dispatchSensorEvent`（加速度、陀螺仪、重力、线性加速度、计步）。
+- Wi-Fi：`WifiInfo` 的 SSID/BSSID/RSSI/频率/连接速度/MAC，`WifiManager` 的连接状态与一条合成 `ScanResult` 扫描结果。
+- 蓝牙：`BluetoothAdapter` 的名称、地址、enabled/state。
+- 蜂窝：`TelephonyManager` 的运营商/MCC-MNC/网络类型/手机类型/SIM 状态/`CellLocation`，以及 `CellIdentityLte`、`CellSignalStrengthLte` 的常见 getter。
 - 点「导出模块 APK」安装；用 LSPatch 选择目标 APK 并勾选模块，patch 后安装；或在 VirtualXposed 中同时安装目标与模块。
-- 模块默认 `WALK / 1.35 m/s / 全部传感器`。点「写入当前配置」通过 Shizuku 写入 `Settings.Global.elsewhere_sensor_config`，或复制 ADB 命令；模块每 2 秒重读。
+- 模块默认 `WALK / 1.35 m/s / 全部运动传感器`，无线分组默认关闭。先在环境页打开 Wi-Fi/蓝牙/基站并填写虚拟值，再点「写入当前配置」通过 Shizuku 写入 `Settings.Global.elsewhere_sensor_config`，或复制 ADB 命令；模块每 2 秒重读。
 - 模块本身不注入未修改的 App；LSPatch 会改变签名，VirtualXposed 会改变运行容器。
 
-详细步骤、配置格式和限制：[`docs/LSPATCH_XPOSED.md`](docs/LSPATCH_XPOSED.md)。
+详细步骤、配置格式、Hook 覆盖和限制：[`docs/LSPATCH_XPOSED.md`](docs/LSPATCH_XPOSED.md)。
 
-> **LSPatch 运行时已验证**：使用官方 LSPatch v1.2 CLI 把模块嵌入目标 APK，patched APK 安装后 logcat 出现 `ELSEWHERE-XPOSED: installed hooks`；重力和加速度被真实改写；通过全局配置关闭后恢复原始值，再开启后再次生效。
+![LSPatch 模块：传感器与无线环境](docs/screenshots/31-wireless-module.png)
+
+> **LSPatch 运行时已验证**：官方 LSPatch v1.2 CLI 把模块嵌入目标 APK，logcat 出现 `ELSEWHERE-XPOSED: installed hooks`；重力 `0,0,9.81`，加速度时变；无线目标读回 `TEST-WIFI-5G / ELSEWHERE-Buds / 46000 / lac=12345 / cid=67890 / rsrp=-88`。关闭环境分组后恢复真实 `AndroidWifi / sdk_gphone64_x86_64 / T-Mobile 310260`，重新开启再次生效。
 
 #### 8. 应用、缓存、更新与诊断
 
@@ -277,7 +283,7 @@ A **classic Xposed API 82 module** is also included for LSPatch / VirtualXposed.
 - System overlay joystick; automatic ring progress during route cruise.
 - In-app joystick, route planning, save, replay.
 - **Route recording** from the live simulated path into a replayable `RoutePlan`.
-- Wi-Fi / Bluetooth / cell Location extras, presets, in-app sensor telemetry.
+- Wi-Fi / Bluetooth / cell environment profiles, Location extras, and LSPatch target-process hooks.
 - App scan, cache size, manual system cache cleanup, external cache snapshots.
 - **Frida Sensor Bridge** generating a real JavaScript hook for six Android sensor types, with JDWP (debuggable targets, no root), root frida-server, and Frida Gadget delivery paths.
 - **LSPatch / VirtualXposed Xposed module**: bundled, exportable API 82 module for patch/virtual-space targets, reading the current motion/sensor config.
@@ -293,8 +299,8 @@ A **classic Xposed API 82 module** is also included for LSPatch / VirtualXposed.
 | Route recording | **App-side sampling** | Samples the currently injected point. |
 | In-app sensors | **App-only telemetry** | No root cannot expose sensor streams to other apps. |
 | Frida sensor hook | **Real hook script, external injection** | JDWP only for debuggable targets; root/Gadget cover other targets; affects the target process only. |
-| LSPatch / Xposed module | **Real hook, patched/virtual target** | Target APK must be patched by LSPatch or run inside VirtualXposed; API 82 module. |
-| Wi-Fi / Bluetooth / cell | **Location extras** | Does not change radio scans. |
+| LSPatch / Xposed module | **Real hook, patched/virtual target** | Target APK must be patched by LSPatch or run inside VirtualXposed; API 82 module covering motion sensors and wireless reads. |
+| Wi-Fi / Bluetooth / cell | **extras + target-process hook** | The LSPatch module rewrites Java Wi-Fi/Bluetooth/cell APIs inside the patched target; system radio scans stay untouched. |
 | Cache clearing | **Manual system page** | Shizuku shell lacks `INTERNAL_DELETE_CACHE_FILES`. |
 
 ### Install
@@ -398,17 +404,21 @@ Related work: [PriviSense (arXiv:2601.22414, ICSE 2026 demo)](https://arxiv.org/
 
 ### LSPatch / VirtualXposed module
 
-The app bundles a **classic Xposed API 82** module (`com.elsewhere.location.xposed`) that hooks `SystemSensorManager$SensorEventQueue.dispatchSensorEvent`. In **Environment → 05 LSPatch / Xposed**:
+The app bundles a **classic Xposed API 82** module (`com.elsewhere.location.xposed`, version 1.1.0) that hooks both motion sensors and wireless reads. In **Environment → 05 LSPatch / Xposed**:
 
 - tap **Export module APK** and install it;
 - patch the target APK with LSPatch and select this module, or install both the target and module inside VirtualXposed;
-- the module defaults to WALK / 1.35 m/s / all channels. Use **Write current config** (Shizuku) or the copied ADB command to write `Settings.Global.elsewhere_sensor_config`; the module re-reads it every 2 seconds.
+- the module defaults to WALK / 1.35 m/s / all motion sensors, with wireless groups off. Enable Wi-Fi / Bluetooth / cell groups in Environment, then use **Write current config** (Shizuku) or the copied ADB command to write `Settings.Global.elsewhere_sensor_config`; the module re-reads it every 2 seconds.
 
-The module was built, signed, exported and installed, then embedded with the official LSPatch v1.2 CLI into a sensor target APK. On launch, logcat showed `ELSEWHERE-XPOSED: installed hooks`; gravity and accelerometer values were rewritten. Setting `enabled=false` through `Settings.Global` restored the raw values, and enabling it again re-applied the hook. The LSPatch manager UI stalled at "Writing & signing" in this emulator, so the CLI path is the verified one. See [`docs/LSPATCH_XPOSED.md`](docs/LSPATCH_XPOSED.md).
+Sensors: `SystemSensorManager$SensorEventQueue.dispatchSensorEvent`. Wireless: `WifiInfo` getters and `WifiManager.getScanResults`, `BluetoothAdapter` identity/state, `TelephonyManager` operator/location, and `CellIdentityLte` / `CellSignalStrengthLte` getters.
+
+![LSPatch module: sensors and wireless](docs/screenshots/31-wireless-module.png)
+
+Verified with LSPatch v1.2 CLI into a target APK: logcat showed `ELSEWHERE-XPOSED: installed hooks`; gravity became `0,0,9.81`, accelerometer values varied, and wireless reads returned `TEST-WIFI-5G`, `ELSEWHERE-Buds`, operator `46000`, LAC 12345/CID 67890, RSRP -88. Disabling the environment groups restored real emulator values (`AndroidWifi`, `sdk_gphone64_x86_64`, T-Mobile `310260`); re-enabling re-applied the virtual values. The LSPatch manager UI stalled at "Writing & signing" in this emulator, so the CLI path is the verified one. See [`docs/LSPATCH_XPOSED.md`](docs/LSPATCH_XPOSED.md).
 
 #### Route recording detail
 
-Start a mock session, open **Motion → Route plans → Start recording**, move via the joystick or a saved route, then **Stop and save**. Points closer to than 1.5 m are ignored; less than 5 m is not saved. The recorded result is a normal route plan and can be replayed, edited or deleted. A process kill loses an unfinished recording.
+Start a mock session, open **Motion → Route plans → Start recording**, move via the joystick or a saved route, then **Stop and save**. Points closer than 1.5 m are ignored; less than 5 m is not saved. The recorded result is a normal route plan and can be replayed, edited or deleted. A process kill loses an unfinished recording.
 
 ### Limits
 

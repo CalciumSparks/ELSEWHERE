@@ -1,7 +1,7 @@
-# 验证记录 · 他乡 / ELSEWHERE 1.1.0
+# 验证记录 · 他乡 / ELSEWHERE 1.1.0 / 1.2.0-dev
 
 验证时间：2026-10-29  
-验证对象：`com.elsewhere.location` 1.1.0-debug / 1.1.0-release  
+验证对象：`com.elsewhere.location` 1.1.0-release / 1.2.0-dev-debug  
 验证环境：Windows 11 · JDK 21 · Gradle 8.9 · Android SDK 35  
 模拟器：`elsewhere_api35` · Android 15 · 1080×2400 · 420dpi · headless  
 Shizuku：13.6.0，服务端以 shell（UID 2000）运行
@@ -199,14 +199,14 @@ cell_network_type=LTE
 
 ### 2.14 Archify 架构图
 
-- 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `b4352362e653465d6bf20f46e6177ca61823d185`。
-- 架构图包含 JDWP loader、Root frida-server、Gadget 三条 Frida 注入路径，以及 LSPatch → Xposed Sensor Module 的 patch/虚拟空间路线。
+- 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `5f367ce883203ff5af15645f8b970d186378cf10`。
+- 架构图包含 JDWP loader、Root frida-server、Gadget 三条 Frida 注入路径，以及 LSPatch → Sensor + Wireless Module 的 patch/虚拟空间路线。
 - 最终 `finalize`：validate / deliver / check / browser-check 全部通过，无诊断。
 - 输出：[`architecture/elsewhere-architecture.html`](architecture/elsewhere-architecture.html) 和嵌入 README 的 PNG。
 
 ### 2.15 LSPatch / Xposed 模块
 
-- `:xposed-sensor:assembleRelease` 成功；模块包 `com.elsewhere.location.xposed`，manifest 包含 `xposedmodule`、`xposedminversion=82`，assets 包含 `xposed_init`。
+- `:xposed-sensor:assembleRelease` 成功；模块包 `com.elsewhere.location.xposed`，版本 1.1.0，manifest 包含 `xposedmodule`、`xposedminversion=82`，assets 包含 `xposed_init`。
 - 模块使用 project release key 签名，打入 `他乡` assets；环境页「05 LSPatch / Xposed」→「导出模块 APK」可分享/安装，`pm install` 成功。
 - 用官方 **LSPatch v1.2 CLI** 将模块嵌入最小传感器目标 APK：
 
@@ -232,6 +232,29 @@ cell_network_type=LTE
 - 环境页 Frida/LSPatch 区块、运动页录制卡片均提供「使用指导」入口；从指导可直接打开环境页/运动页。
 - 验证 release 1.1.0 安装后，设置 →「阅读完整指导」正常打开，标题显示 `v1.1.0`。
 - 证据：[`30-guide.png`](screenshots/30-guide.png)。
+
+### 2.17 LSPatch 虚拟无线环境（1.2.0-dev）
+
+- 模块 1.1.0 新增无线 Hook；配置仍走 `Settings.Global.elsewhere_sensor_config`，新增 `environment` 分组（Wi-Fi / 蓝牙 / cell）。
+- 用 LSPatch v1.2 CLI 将新模块嵌入一个带 Wi-Fi / 蓝牙 / 电话读取的最小目标 APK；配置：
+
+  ```json
+  {"environment":{"wifi":{"enabled":true,"ssid":"TEST-WIFI-5G","bssid":"AA:BB:CC:DD:EE:FF","rssi":-55,"channel":149},"bluetooth":{"enabled":true,"name":"ELSEWHERE-Buds","address":"11:22:33:44:55:66","rssi":-60},"cell":{"enabled":true,"carrier":"ELSEWHERE-CELL","mcc":"460","mnc":"00","areaCode":12345,"cellId":67890,"networkType":"LTE","signalDbm":-88}}}
+  ```
+
+- 目标实际读取（logcat `WIRELESS-TARGET`）：
+
+  ```text
+  WIFI ssid="TEST-WIFI-5G" bssid=AA:BB:CC:DD:EE:FF rssi=-55 freq=5745 speed=866 mac=AA:BB:CC:DD:EE:FF
+  SCAN count=1 ssid=TEST-WIFI-5G bssid=AA:BB:CC:DD:EE:FF level=-55 freq=5745
+  BT name=ELSEWHERE-Buds addr=11:22:33:44:55:66 enabled=true state=12
+  CELL op=46000 name=ELSEWHERE-CELL sim=46000 type=13 dataType=13 lac=12345 cid=67890 all=1
+  CELLIDENT mcc=460 mnc=0 ci=67890 tac=12345 rsrp=-88 level=2
+  ```
+
+- 同一目标同时读回 `gravity 0,0,9.81`，证明运动传感器与无线环境由同一模块/配置提供。
+- 关闭 `environment.*.enabled` 后目标立即恢复模拟器真实值（`AndroidWifi`、`sdk_gphone64_x86_64`、T-Mobile `310260`、真实 lac/cid）；重新开启再次切换为虚拟值。
+- 证据：[`31-wireless-module.png`](screenshots/31-wireless-module.png) 及上述 logcat。模块说明见 [`LSPATCH_XPOSED.md`](LSPATCH_XPOSED.md)。
 
 ---
 

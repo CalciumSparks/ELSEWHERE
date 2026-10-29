@@ -9,7 +9,7 @@
     "repository": {
       "url": "git@github.com:CalciumSparks/ELSEWHERE.git",
       "link_mode": "local-only",
-      "revision": "b4352362e653465d6bf20f46e6177ca61823d185"
+      "revision": "5f367ce883203ff5af15645f8b970d186378cf10"
     }
   },
   "components": [
@@ -353,8 +353,8 @@
     {
       "id": "xposed_module",
       "type": "backend",
-      "label": "Xposed Sensor Module",
-      "sublabel": "API 82 · dispatch hook",
+      "label": "Sensor + Wireless Module",
+      "sublabel": "API 82 · sensors · Wi-Fi/BT/cell",
       "pos": [
         790,
         900
@@ -366,15 +366,15 @@
       "sources": [
         {
           "path": "xposed-sensor/src/main/java/com/elsewhere/location/xposed/SensorHook.java",
-          "line": 32
+          "line": 104
         },
         {
           "path": "xposed-sensor/src/main/java/com/elsewhere/location/xposed/SensorHook.java",
-          "line": 51
+          "line": 259
         },
         {
           "path": "xposed-sensor/src/main/java/com/elsewhere/location/xposed/SensorHook.java",
-          "line": 100
+          "line": 288
         }
       ]
     }
@@ -558,21 +558,11 @@
     },
     {
       "dot": "violet",
-      "title": "LSPatch / VirtualXposed",
-      "items": [
-        "These are patch-or-virtualize routes, not JDWP injection.",
-        "LSPatch needs an Xposed module and a modified APK.",
-        "VirtualXposed runs the target inside its virtual space.",
-        "Neither is integrated in this build; JDWP is the no-repackaging route."
-      ]
-    },
-    {
-      "dot": "violet",
       "title": "LSPatch / Xposed",
       "items": [
-        "Separate APK patched or virtualized target; no root.",
-        "Module hooks dispatchSensorEvent on API 82.",
-        "Global config: Settings.Global.elsewhere_sensor_config."
+        "Separate APK patched or virtualized target; no root required.",
+        "Module 1.1.0 hooks motion sensors plus Wi-FiInfo/scan, BluetoothAdapter and telephony cells.",
+        "Global config: Settings.Global.elsewhere_sensor_config (sensors + environment)."
       ]
     }
   ]

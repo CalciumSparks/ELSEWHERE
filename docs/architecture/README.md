@@ -1,7 +1,7 @@
 # Architecture diagram
 
 Generated with **Archify 3.2.0** from the repository at revision
-`b4352362e653465d6bf20f46e6177ca61823d185`.
+`5f367ce883203ff5af15645f8b970d186378cf10`.
 
 - Interactive artifact: [`elsewhere-architecture.html`](elsewhere-architecture.html)
 - README image: [`elsewhere-architecture.png`](elsewhere-architecture.png)
@@ -31,7 +31,9 @@ The diagram deliberately separates:
   - a **root frida-server** (any target);
   - a **Frida Gadget** repackaged into the target.
 - the **LSPatch / VirtualXposed** route: LSPatch patches the target and embeds
-  the `Xposed Sensor Module` (API 82), or VirtualXposed runs both in its virtual
-  space. This is a separate patch/virtualization route, not JDWP.
+  the `Sensor + Wireless Module` (API 82), or VirtualXposed runs both in its
+  virtual space. This is a separate patch/virtualization route, not JDWP.
+- the module hooks motion sensors plus Java Wi-Fi (`WifiInfo`/scan),
+  `BluetoothAdapter`, and telephony (`TelephonyManager`/`CellIdentityLte`).
 - `Settings.Global.elsewhere_sensor_config` supplies the module config; the app
-  exports the module APK and writes/copies that config.
+  exports the module APK and writes/copies sensors + environment groups.
