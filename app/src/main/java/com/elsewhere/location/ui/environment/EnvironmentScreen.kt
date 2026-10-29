@@ -1,5 +1,9 @@
 package com.elsewhere.location.ui.environment
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -37,8 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +56,7 @@ import com.elsewhere.location.core.DriftTempo
 import com.elsewhere.location.core.EnvironmentProfile
 import com.elsewhere.location.core.WifiProfile
 import com.elsewhere.location.ui.ElsewhereViewModel
+import com.elsewhere.location.ui.FridaUiState
 import com.elsewhere.location.ui.components.DriftPlot
 import com.elsewhere.location.ui.components.EIcon
 import com.elsewhere.location.ui.components.Hairline
@@ -66,6 +73,7 @@ import com.elsewhere.location.ui.components.SurveyTextField
 import com.elsewhere.location.ui.components.TinyActionChip
 import com.elsewhere.location.ui.theme.Amber
 import com.elsewhere.location.ui.theme.Faint
+import com.elsewhere.location.ui.theme.Green
 import com.elsewhere.location.ui.theme.Ink
 import com.elsewhere.location.ui.theme.InkSoft
 import com.elsewhere.location.ui.theme.JetBrainsMono
@@ -91,8 +99,18 @@ fun EnvironmentScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val session by viewModel.session.collectAsStateWithLifecycle()
+    val frida by viewModel.fridaUi.collectAsStateWithLifecycle()
     val environment = settings.environment
     val drift = settings.drift
+    val context = LocalContext.current
+    var fridaTargetDraft by remember(frida.targetPackage) {
+        mutableStateOf(frida.targetPackage)
+    }
+    val copyText: (String, String) -> Unit = { label, text ->
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+        Toast.makeText(context, "已复制 $label", Toast.LENGTH_SHORT).show()
+    }
     val driftPhaseTransition = rememberInfiniteTransition(label = "drift")
     val driftPhase by driftPhaseTransition.animateFloat(
         initialValue = 0f,
@@ -567,6 +585,44 @@ fun EnvironmentScreen(
                     )
                 }
             }
+
+            Spacer(Modifier.height(18.dp))
+            SectionRule(
+                index = "04",
+                title = "Frida 动态 Hook",
+                english = "frida sensor bridge",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                trailing = {
+                    Text(
+                        "EXTERNAL INJECTION",
+                        style = MonoTiny.copy(fontSize = 8.sp),
+                        color = Signal,
+                    )
+                },
+            )
+            FridaSensorBridgeSection(
+                frida = frida,
+                targetDraft = fridaTargetDraft,
+                onTargetDraftChange = { fridaTargetDraft = it },
+                sensorSummary = listOfNotNull(
+                    "ACCEL".takeIf { settings.sensors.accelerometer },
+                    "GYRO".takeIf { settings.sensors.gyroscope },
+                    "GRAVITY".takeIf { settings.sensors.gravity },
+                    "LINEAR".takeIf { settings.sensors.linearAcceleration },
+                    "STEPS".takeIf { settings.sensors.stepCounter },
+                    "DETECT".takeIf { settings.sensors.stepDetector },
+                ).joinToString(" · ").ifBlank { "NONE" },
+                modeLabel = "${settings.motionMode.title} · %.1f m/s".format(
+                    settings.speeds.forMode(settings.motionMode),
+                ),
+                onCheckEnvironment = viewModel::refreshFridaEnvironment,
+                onGenerate = {
+                    viewModel.setFridaTarget(fridaTargetDraft)
+                    viewModel.generateFridaHook(fridaTargetDraft)
+                },
+                onCopy = copyText,
+            )
+
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -661,6 +717,199 @@ private fun EnvironmentSourceBlock(
                 content()
             }
         }
+    }
+}
+
+@Composable
+private fun FridaSensorBridgeSection(
+    frida: FridaUiState,
+    targetDraft: String,
+    onTargetDraftChange: (String) -> Unit,
+    sensorSummary: String,
+    modeLabel: String,
+    onCheckEnvironment: () -> Unit,
+    onGenerate: () -> Unit,
+    onCopy: (String, String) -> Unit,
+) {
+    val environment = frida.environment
+    val checked = environment?.checked == true
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        NoticeBlock(
+            text = "Frida 需要外部注入环境：Root + frida-server，或把 Frida Gadget 打进目标 APK。Shizuku 只负责生成 / 部署脚本，不能跨进程 ptrace。",
+            title = "外部注入 / 不是无 Root 自动 Hook",
+            tone = StatusTone.Warning,
+        )
+        Spacer(Modifier.height(10.dp))
+        SurveyTextField(
+            value = targetDraft,
+            onValueChange = onTargetDraftChange,
+            label = "TARGET PACKAGE",
+            placeholder = "com.example.target",
+            keyboardType = KeyboardType.Text,
+            imeAction = ImeAction.Done,
+            onImeAction = onGenerate,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TinyActionChip(
+                text = if (frida.checkingEnvironment) "检测中…" else "检测环境",
+                onClick = onCheckEnvironment,
+                icon = EIcon.Refresh,
+                enabled = !frida.checkingEnvironment,
+            )
+            Spacer(Modifier.width(7.dp))
+            TinyActionChip(
+                text = if (frida.generating) "生成中…" else "生成 Hook 脚本",
+                onClick = onGenerate,
+                selected = true,
+                icon = EIcon.Sensors,
+                enabled = !frida.generating && targetDraft.isNotBlank(),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(PaperHigh)
+                .border(1.dp, Line, RoundedCornerShape(2.dp))
+                .padding(horizontal = 12.dp, vertical = 5.dp),
+        ) {
+            FridaStatusRow(
+                label = "SHIZUKU",
+                value = when {
+                    environment == null -> "NOT CHECKED"
+                    environment.shizukuReady -> "READY"
+                    else -> "LIMITED"
+                },
+                color = when {
+                    !checked -> Faint
+                    environment?.shizukuReady == true -> Green
+                    else -> Amber
+                },
+            )
+            FridaStatusRow(
+                label = "SU BINARY",
+                value = when {
+                    !checked -> "—"
+                    environment?.suBinary == true -> "FOUND"
+                    else -> "NOT FOUND"
+                },
+                color = when {
+                    !checked -> Faint
+                    environment?.suBinary == true -> Amber
+                    else -> Faint
+                },
+            )
+            FridaStatusRow(
+                label = "FRIDA SERVER",
+                value = when {
+                    !checked -> "—"
+                    environment?.fridaServer == true -> "RUNNING"
+                    else -> "NOT FOUND"
+                },
+                color = when {
+                    !checked -> Faint
+                    environment?.fridaServer == true -> Green
+                    else -> Amber
+                },
+            )
+            FridaStatusRow(label = "HOOK MODE", value = modeLabel, color = Ink)
+        }
+        if (frida.error != null) {
+            Spacer(Modifier.height(7.dp))
+            Text(frida.error, style = MonoTiny.copy(fontSize = 8.sp), color = Amber)
+        }
+        if (frida.notice != null && frida.artifact == null) {
+            Spacer(Modifier.height(7.dp))
+            Text(frida.notice, style = MonoTiny.copy(fontSize = 8.sp), color = Muted)
+        }
+        val artifact = frida.artifact
+        if (artifact != null) {
+            Spacer(Modifier.height(10.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(CutCornerShape(topEnd = 14.dp, bottomStart = 14.dp))
+                    .background(Ink)
+                    .padding(13.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("FRIDA SCRIPT / READY", style = MonoLabel.copy(fontSize = 8.sp), color = Live)
+                    Spacer(Modifier.weight(1f))
+                    Text("EXTERNAL", style = MonoTiny.copy(fontSize = 7.sp), color = Paper.copy(alpha = 0.38f))
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "TARGET  ${artifact.targetPackage}",
+                    style = MonoTiny.copy(fontSize = 8.sp),
+                    color = Paper.copy(alpha = 0.75f),
+                )
+                Text(
+                    "CHANNELS  $sensorSummary",
+                    style = MonoTiny.copy(fontSize = 8.sp),
+                    color = Paper.copy(alpha = 0.55f),
+                )
+                Text(
+                    "LOCAL  ${artifact.localPath}",
+                    style = MonoTiny.copy(fontSize = 7.sp),
+                    color = Paper.copy(alpha = 0.4f),
+                )
+                artifact.deployedPath?.let { path ->
+                    Text(
+                        "DEVICE  $path",
+                        style = MonoTiny.copy(fontSize = 7.sp),
+                        color = Live.copy(alpha = 0.8f),
+                    )
+                }
+                Spacer(Modifier.height(9.dp))
+                Text("HOST COMMAND", style = MonoTiny.copy(fontSize = 7.sp), color = Live)
+                Text(
+                    artifact.hostCommand,
+                    style = MonoTiny.copy(fontSize = 8.sp).copy(fontFamily = JetBrainsMono),
+                    color = Paper.copy(alpha = 0.82f),
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TinyActionChip(
+                        text = "复制电脑命令",
+                        onClick = { onCopy("Frida host command", artifact.hostCommand) },
+                        selected = true,
+                        dark = true,
+                        icon = EIcon.External,
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    TinyActionChip(
+                        text = "复制设备命令",
+                        onClick = { onCopy("Frida device command", artifact.deviceCommand) },
+                        dark = true,
+                    )
+                }
+                if (artifact.note.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(artifact.note, style = MonoTiny.copy(fontSize = 7.sp), color = Amber)
+                }
+            }
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(
+            "传感器 Hook 只在目标进程内生效；目标 App 仍需运行并注册对应 SensorEventListener。没有外部 Frida 客户端时，本节只生成脚本。",
+            style = MonoTiny.copy(fontSize = 8.sp),
+            color = Faint,
+        )
+    }
+}
+
+@Composable
+private fun FridaStatusRow(label: String, value: String, color: Color) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MonoLabel.copy(fontSize = 8.sp), color = Muted)
+        Spacer(Modifier.weight(1f))
+        Text(value, style = MonoTiny.copy(fontSize = 8.sp), color = color)
     }
 }
 

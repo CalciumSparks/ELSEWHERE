@@ -3,6 +3,7 @@ package com.elsewhere.location
 import android.content.Context
 import com.elsewhere.location.data.CacheBackupRepository
 import com.elsewhere.location.data.DiagnosticsRepository
+import com.elsewhere.location.data.FridaSensorRepository
 import com.elsewhere.location.data.GeocodingRepository
 import com.elsewhere.location.data.SettingsRepository
 import com.elsewhere.location.data.TargetAppRepository
@@ -36,5 +37,9 @@ class AppContainer(context: Context) {
     val diagnosticsRepository: DiagnosticsRepository = DiagnosticsRepository(
         context = appContext,
         shizukuManager = shizukuManager,
+    )
+    val fridaSensorRepository: FridaSensorRepository = FridaSensorRepository(
+        context = appContext,
+        shizuku = shizukuManager,
     )
 }

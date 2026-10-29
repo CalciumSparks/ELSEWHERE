@@ -7,6 +7,8 @@ import com.elsewhere.location.core.MotionMode
 import com.elsewhere.location.core.SavedPlace
 import com.elsewhere.location.core.SystemReport
 import com.elsewhere.location.core.UpdateInfo
+import com.elsewhere.location.data.FridaEnvironment
+import com.elsewhere.location.data.FridaScriptArtifact
 import com.elsewhere.location.data.TargetAppInfo
 
 sealed interface MapCommand {
@@ -112,6 +114,24 @@ data class AppsUiState(
         }
     }
 }
+
+data class RouteRecorderUiState(
+    val recording: Boolean = false,
+    val pointCount: Int = 0,
+    val elapsedSeconds: Long = 0L,
+    val distanceMeters: Double = 0.0,
+    val error: String? = null,
+)
+
+data class FridaUiState(
+    val targetPackage: String = "",
+    val checkingEnvironment: Boolean = false,
+    val environment: FridaEnvironment? = null,
+    val generating: Boolean = false,
+    val artifact: FridaScriptArtifact? = null,
+    val error: String? = null,
+    val notice: String? = null,
+)
 
 data class DiagnosticsUiState(
     val loading: Boolean = false,

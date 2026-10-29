@@ -82,6 +82,7 @@ import com.elsewhere.location.ui.components.SurveySlider
 import com.elsewhere.location.ui.components.SurveySwitch
 import com.elsewhere.location.ui.components.TinyActionChip
 import com.elsewhere.location.ui.components.TonalTag
+import com.elsewhere.location.ui.RouteRecorderUiState
 import com.elsewhere.location.ui.theme.Amber
 import com.elsewhere.location.ui.theme.Danger
 import com.elsewhere.location.ui.theme.Faint
@@ -113,6 +114,7 @@ fun MotionScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val session by viewModel.session.collectAsStateWithLifecycle()
     val permissions by viewModel.permissions.collectAsStateWithLifecycle()
+    val routeRecorder by viewModel.routeRecorderUi.collectAsStateWithLifecycle()
     val haptics = LocalHapticFeedback.current
     val activeMode = if (session.running) session.mode else settings.motionMode
     val currentSpeed = if (session.running) session.baseSpeedMps else settings.speeds.forMode(activeMode)
@@ -532,6 +534,14 @@ fun MotionScreen(
                     TinyActionChip("新建路线", onClick = onPlanRoute, icon = EIcon.Plus)
                 },
             )
+            RouteRecorderCard(
+                state = routeRecorder,
+                sessionRunning = session.running,
+                onStart = viewModel::startRouteRecording,
+                onStop = { viewModel.stopRouteRecording(save = true) },
+                onDiscard = { viewModel.stopRouteRecording(save = false) },
+            )
+            Spacer(Modifier.height(8.dp))
             if (settings.routes.isEmpty()) {
                 EmptyRoutes(onPlanRoute)
             } else {
@@ -753,6 +763,82 @@ private fun RouteCruisePanel(
         }
     }
 }
+
+@Composable
+private fun RouteRecorderCard(
+    state: RouteRecorderUiState,
+    sessionRunning: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    if (state.recording) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clip(CutCornerShape(topEnd = 18.dp, bottomStart = 18.dp))
+                .background(Ink)
+                .padding(14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SignalDot(Live, 6.dp)
+                Spacer(Modifier.width(7.dp))
+                Text("RECORDING / 正在录制", style = MonoLabel.copy(fontSize = 9.sp), color = PaperHigh)
+                Spacer(Modifier.weight(1f))
+                Text(formatRecordingDuration(state.elapsedSeconds), style = MonoTiny, color = Live)
+            }
+            Spacer(Modifier.height(9.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    Geo.formatDistance(state.distanceMeters),
+                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 29.sp, lineHeight = 30.sp),
+                    color = PaperHigh,
+                )
+                Spacer(Modifier.weight(1f))
+                Text("${state.pointCount} PTS", style = MonoTiny.copy(fontSize = 8.sp), color = Paper.copy(alpha = 0.48f))
+            }
+            Spacer(Modifier.height(9.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TinyActionChip("结束并保存", onStop, selected = true, dark = true, icon = EIcon.Stop)
+                Spacer(Modifier.width(7.dp))
+                TinyActionChip("放弃", onDiscard, dark = true)
+            }
+        }
+    } else {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clip(CutCornerShape(topEnd = 14.dp, bottomStart = 14.dp))
+                .background(PaperHigh)
+                .border(1.dp, Line, CutCornerShape(topEnd = 14.dp, bottomStart = 14.dp))
+                .padding(13.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(EIcon.Record, contentDescription = null, tint = Signal, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("录制当前轨迹", style = MaterialTheme.typography.titleMedium, color = Ink)
+                    Text(
+                        if (sessionRunning) "按当前移动路径采样，结束后保存为可巡航路线。" else "先开始模拟，再用摇杆或路线移动。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                TinyActionChip("开始录制", onStart, icon = EIcon.Record, enabled = sessionRunning)
+            }
+            if (state.error != null) {
+                Spacer(Modifier.height(7.dp))
+                Text(state.error, style = MonoTiny.copy(fontSize = 8.sp), color = Amber)
+            }
+        }
+    }
+}
+
+private fun formatRecordingDuration(seconds: Long): String =
+    "%02d:%02d".format(Locale.US, seconds / 60, seconds % 60)
 
 @Composable
 private fun EmptyRoutes(onPlanRoute: () -> Unit) {

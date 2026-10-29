@@ -117,6 +117,10 @@ object EIcon {
         closed { moveTo(7f, 4.5f); lineTo(20f, 12f); lineTo(7f, 19.5f); close() }
     }
 
+    val Record = icon("record") {
+        closed { addOval(Rect(5f, 5f, 19f, 19f)) }
+    }
+
     val Stop = icon("stop") {
         closed { moveTo(6.5f, 6.5f); lineTo(17.5f, 6.5f); lineTo(17.5f, 17.5f); lineTo(6.5f, 17.5f); close() }
     }

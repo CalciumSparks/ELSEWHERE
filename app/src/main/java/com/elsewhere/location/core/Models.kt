@@ -173,6 +173,7 @@ data class AppSettings(
     val routes: List<RoutePlan> = emptyList(),
     val backups: List<CacheBackupRecord> = emptyList(),
     val updateRepo: String = "",
+    val fridaTargetPackage: String = "",
     val amapWebKey: String = "",
     val showSensorNotice: Boolean = true,
     val lastBackupAtEpochMs: Long = 0L,

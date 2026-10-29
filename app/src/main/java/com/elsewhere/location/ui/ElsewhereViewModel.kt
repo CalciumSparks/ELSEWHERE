@@ -22,6 +22,7 @@ import com.elsewhere.location.core.GeocodeResult
 import com.elsewhere.location.core.MapLayer
 import com.elsewhere.location.core.MotionMode
 import com.elsewhere.location.core.RoutePlan
+import com.elsewhere.location.core.RouteRecorder
 import com.elsewhere.location.core.SavedPlace
 import com.elsewhere.location.core.SensorConfig
 import com.elsewhere.location.core.SessionStartConfig
@@ -63,6 +64,7 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
     private val targetApps = container.targetAppRepository
     private val cacheRepository = container.cacheBackupRepository
     private val diagnosticsRepository = container.diagnosticsRepository
+    private val fridaRepository = container.fridaSensorRepository
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(
         viewModelScope,
@@ -78,6 +80,11 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
     private val _mapUi = MutableStateFlow(MapUiState())
     val mapUi: StateFlow<MapUiState> = _mapUi.asStateFlow()
 
+    private val _routeRecorderUi = MutableStateFlow(RouteRecorderUiState())
+    val routeRecorderUi: StateFlow<RouteRecorderUiState> = _routeRecorderUi.asStateFlow()
+    private var activeRouteRecorder: RouteRecorder? = null
+    private var routeRecordingJob: Job? = null
+
     private val _permissions = MutableStateFlow(PermissionUiState())
     val permissions: StateFlow<PermissionUiState> = _permissions.asStateFlow()
 
@@ -89,6 +96,9 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _updateUi = MutableStateFlow(UpdateUiState())
     val updateUi: StateFlow<UpdateUiState> = _updateUi.asStateFlow()
+
+    private val _fridaUi = MutableStateFlow(FridaUiState())
+    val fridaUi: StateFlow<FridaUiState> = _fridaUi.asStateFlow()
 
     private val _mapCommands = MutableSharedFlow<MapCommand>(
         replay = 0,
@@ -143,6 +153,13 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
                     _mapCommands.tryEmit(
                         MapCommand.MoveTo(current.lastPoint, zoom = null, animate = false),
                     )
+                    _fridaUi.update {
+                        if (it.targetPackage.isBlank()) {
+                            it.copy(targetPackage = current.fridaTargetPackage)
+                        } else {
+                            it
+                        }
+                    }
                 }
             }
         }
@@ -882,6 +899,108 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
         _events.tryEmit(UiEvent.NavigateToMap)
     }
 
+    fun startRouteRecording() {
+        if (_routeRecorderUi.value.recording) return
+        val current = session.value
+        val point = current.currentPoint
+        if (!current.running || point == null) {
+            _routeRecorderUi.value = RouteRecorderUiState(error = "先开始模拟，再录制移动轨迹。")
+            return
+        }
+        val recorder = RouteRecorder(minPointDistanceMeters = 1.5)
+        recorder.start(point)
+        activeRouteRecorder = recorder
+        _routeRecorderUi.value = RouteRecorderUiState(
+            recording = true,
+            pointCount = 1,
+            elapsedSeconds = 0L,
+            distanceMeters = 0.0,
+        )
+        routeRecordingJob?.cancel()
+        routeRecordingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1_000)
+                val active = activeRouteRecorder
+                if (active !== recorder) break
+                if (!session.value.running) {
+                    activeRouteRecorder = null
+                    routeRecordingJob = null
+                    if (active.canSave()) {
+                        persistRecordedRoute(active, auto = true)
+                    } else {
+                        active.stop()
+                        _routeRecorderUi.value = RouteRecorderUiState(
+                            error = "模拟已停止；本次录制不足 5 m，未保存。",
+                        )
+                    }
+                    break
+                }
+                session.value.currentPoint?.let { recorder.add(it) }
+                val snapshot = recorder.snapshot()
+                _routeRecorderUi.update {
+                    it.copy(
+                        recording = true,
+                        pointCount = snapshot.pointCount,
+                        elapsedSeconds = snapshot.elapsedSeconds,
+                        distanceMeters = snapshot.distanceMeters,
+                        error = null,
+                    )
+                }
+            }
+        }
+    }
+
+    fun stopRouteRecording(save: Boolean = true) {
+        val recorder = activeRouteRecorder ?: return
+        routeRecordingJob?.cancel()
+        routeRecordingJob = null
+        activeRouteRecorder = null
+        recorder.stop()
+        if (save && recorder.canSave()) {
+            viewModelScope.launch {
+                persistRecordedRoute(recorder, auto = false)
+            }
+        } else {
+            _routeRecorderUi.value = RouteRecorderUiState(
+                error = if (save) "至少移动 5 m 才能保存路线。" else "已放弃本次录制。",
+            )
+        }
+    }
+
+    private suspend fun persistRecordedRoute(recorder: RouteRecorder, auto: Boolean) {
+        val snapshot = recorder.snapshot()
+        val points = snapshot.points
+        if (points.size < 2 || snapshot.distanceMeters < 5.0) {
+            _routeRecorderUi.value = RouteRecorderUiState(error = "本次录制不足 5 m，未保存。")
+            return
+        }
+        val mode = if (session.value.running) session.value.mode else settings.value.motionMode
+        val route = RoutePlan(
+            id = UUID.randomUUID().toString(),
+            name = "录制 ${SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date())}",
+            points = points,
+            loop = false,
+            mode = mode,
+        )
+        settingsRepository.update {
+            it.copy(
+                routes = (it.routes + route).takeLast(30),
+                lastPoint = route.points.first(),
+                lastPointLabel = "路线 · ${route.name}",
+            )
+        }
+        _routeRecorderUi.value = RouteRecorderUiState()
+        _events.emit(
+            UiEvent.Message(
+                if (auto) {
+                    "模拟已停止，录制路线「${route.name}」已保存（${Geo.formatDistance(route.distanceMeters)}）。"
+                } else {
+                    "录制路线「${route.name}」已保存（${Geo.formatDistance(route.distanceMeters)}）。"
+                },
+            ),
+        )
+    }
+
     fun deleteRoute(route: RoutePlan) {
         viewModelScope.launch {
             settingsRepository.update { current ->
@@ -903,6 +1022,108 @@ class ElsewhereViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setSensors(sensors: SensorConfig) {
         mutateSettings { it.copy(sensors = sensors) }
+        _fridaUi.update {
+            it.copy(
+                artifact = null,
+                notice = "传感器开关已变化；重新生成 Frida 脚本后生效。",
+                error = null,
+            )
+        }
+    }
+
+    fun setFridaTarget(packageName: String) {
+        val clean = packageName.trim()
+        mutateSettings { it.copy(fridaTargetPackage = clean) }
+        _fridaUi.update {
+            it.copy(
+                targetPackage = clean,
+                artifact = null,
+                notice = null,
+                error = null,
+            )
+        }
+    }
+
+    fun refreshFridaEnvironment() {
+        if (_fridaUi.value.checkingEnvironment) return
+        _fridaUi.update { it.copy(checkingEnvironment = true, error = null) }
+        viewModelScope.launch {
+            fridaRepository.inspectEnvironment()
+                .onSuccess { environment ->
+                    _fridaUi.update {
+                        it.copy(
+                            checkingEnvironment = false,
+                            environment = environment,
+                            error = null,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _fridaUi.update {
+                        it.copy(
+                            checkingEnvironment = false,
+                            error = error.message ?: "无法读取 Frida 环境。",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun generateFridaHook(targetOverride: String? = null) {
+        if (_fridaUi.value.generating) return
+        val target = (targetOverride ?: _fridaUi.value.targetPackage).trim()
+        if (!shizuku.isSafePackageName(target)) {
+            _fridaUi.update {
+                it.copy(
+                    targetPackage = target,
+                    error = "目标包名格式无效，例如 com.example.app。",
+                    notice = null,
+                )
+            }
+            return
+        }
+        mutateSettings { it.copy(fridaTargetPackage = target) }
+        _fridaUi.update {
+            it.copy(
+                targetPackage = target,
+                generating = true,
+                artifact = null,
+                notice = null,
+                error = null,
+            )
+        }
+        viewModelScope.launch {
+            val current = settingsRepository.current()
+            val mode = current.motionMode
+            val speed = current.speeds.forMode(mode)
+            fridaRepository.generate(
+                targetPackage = target,
+                mode = mode,
+                speedMps = speed,
+                sensors = current.sensors,
+            ).onSuccess { artifact ->
+                _fridaUi.update {
+                    it.copy(
+                        generating = false,
+                        artifact = artifact,
+                        notice = when {
+                            artifact.deployedPath != null ->
+                                "脚本已部署到设备的 /data/local/tmp。将脚本拉到电脑后，在外部运行 Frida。"
+                            artifact.note.isNotBlank() -> artifact.note
+                            else -> "脚本已生成。将脚本拉到电脑后，在外部运行 Frida。"
+                        },
+                    )
+                }
+                _events.tryEmit(UiEvent.Message("Frida Hook 脚本已生成。"))
+            }.onFailure { error ->
+                _fridaUi.update {
+                    it.copy(
+                        generating = false,
+                        error = error.message ?: "生成 Frida Hook 脚本失败。",
+                    )
+                }
+            }
+        }
     }
 
     fun applyEnvironmentPreset(preset: String) {
