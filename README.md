@@ -6,9 +6,9 @@
 
 [![他乡系统结构](docs/architecture/elsewhere-architecture.png)](docs/architecture/elsewhere-architecture.html)
 
-> **最新 Release / Latest:** [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0) · 2026-10-29  
-> **main / 1.2.0-dev:** LSPatch 模块新增虚拟无线环境（Wi-Fi / 蓝牙 / 蜂窝）；当前 release 仍为 v1.1.0。  
-> `main` adds virtual wireless environment hooks (Wi-Fi / Bluetooth / cell) to the LSPatch module in 1.2.0-dev; the latest release remains v1.1.0.
+> **最新 Release / Latest:** [`v1.1.1`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.1) · 2026-10-29  
+> LSPatch 模块新增虚拟无线环境（Wi-Fi / 蓝牙 / 蜂窝），与虚拟运动传感器共用同一配置。  
+> The LSPatch module now injects a virtual wireless environment (Wi-Fi / Bluetooth / cell) alongside motion sensors, from one shared config.
 
 ---
 
@@ -60,10 +60,10 @@
 
 ### 安装
 
-当前发行版是 [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0)。从 Release 下载 APK：
+当前发行版是 [`v1.1.1`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.1)。从 Release 下载 APK：
 
 ```bash
-adb install elsewhere-1.1.0.apk
+adb install elsewhere-1.1.1.apk
 ```
 
 也可以从源码构建：
@@ -210,7 +210,7 @@ frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
 - 无 Root 不能改变系统 Wi-Fi / 蓝牙 / 基站扫描结果。
 - 注入位置会被系统标记为 mock；不绕过反作弊或 Mock 检测。
 - 路线录制采样的是**当前模拟输出**，不是独立的真实 GPS 轨迹记录器。
-- 更新检查只读取公开 GitHub Release，不自动下载安装；v1.1.0 已发布。
+- 更新检查只读取公开 GitHub Release，不自动下载安装；v1.1.1 已发布。
 - PriviSense 是 rooted-device 研究框架，可作设计参考，但不是本项目的免 Root 实现。
 
 ### 构建与验证
@@ -305,10 +305,10 @@ A **classic Xposed API 82 module** is also included for LSPatch / VirtualXposed.
 
 ### Install
 
-The current release is [`v1.1.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.0):
+The current release is [`v1.1.1`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.1.1):
 
 ```bash
-adb install elsewhere-1.1.0.apk
+adb install elsewhere-1.1.1.apk
 ```
 
 Or build from source:
@@ -429,7 +429,7 @@ Start a mock session, open **Motion → Route plans → Start recording**, move 
 - Other apps' private caches cannot be cleared or backed up silently; external snapshots may not be readable by the target after write-back.
 - Frida injection is external. Shizuku cannot ptrace another UID. JDWP uses ADB's debug protocol; it does not remove the debuggable requirement.
 - The route recorder captures the simulated output, not an independent real-GPS track.
-- Release APK v1.1.0 contains the new features; older v1.0.0 remains available for rollback.
+- Release APK v1.1.1 contains the wireless-environment module; older v1.1.0 and v1.0.0 remain available for rollback.
 
 ### Build and verification
 

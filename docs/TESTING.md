@@ -1,7 +1,7 @@
-# 验证记录 · 他乡 / ELSEWHERE 1.1.0 / 1.2.0-dev
+# 验证记录 · 他乡 / ELSEWHERE 1.1.1
 
 验证时间：2026-10-29  
-验证对象：`com.elsewhere.location` 1.1.0-release / 1.2.0-dev-debug  
+验证对象：`com.elsewhere.location` 1.1.1-release  
 验证环境：Windows 11 · JDK 21 · Gradle 8.9 · Android SDK 35  
 模拟器：`elsewhere_api35` · Android 15 · 1080×2400 · 420dpi · headless  
 Shizuku：13.6.0，服务端以 shell（UID 2000）运行
@@ -43,13 +43,13 @@ $env:ANDROID_HOME='D:\Android\sdk'
 ```powershell
 .\gradlew.bat :app:assembleRelease --no-daemon
 # zipalign + apksigner，详见 README
-apksigner verify --print-certs dist\elsewhere-1.1.0.apk
+apksigner verify --print-certs dist\elsewhere-1.1.1.apk
 ```
 
 结果：
 
-- APK 安装成功，`versionName=1.1.0`，`versionCode=2`。
-- APK SHA-256：`652f52afe5b175790e3b6ec5c6f4ff1031bb7d4b2da0a75ff6b0e08ab8847fd2`。
+- APK 安装成功，`versionName=1.1.1`，`versionCode=3`。
+- APK SHA-256：`566da617725db7a9f9d1f9f0758449574453700e83ab5dd69a9db962751d6987`。
 - 签名证书 SHA-256：`27780366d4d1a041c0eb99b8b99bfafb9374de4d35af4ed840e422f2598349d0`。
 - `dist/SHA256SUMS.txt` 记录发行包与调试包的 SHA-256。
 
@@ -166,9 +166,9 @@ cell_network_type=LTE
 
 ### 2.11 GitHub 更新检查
 
-- 更新源已配置为 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE)，并已发布 `v1.1.0` Release（APK + SHA256SUMS 资产）。
-- 应用版本同为 `1.1.0`，检查返回 `tag_name=v1.1.0`、发布说明和 APK 资产，界面正确显示「已是最新」而不会误报更新。
-- 从 GitHub 下载的 Release APK SHA-256：`652f52afe5b175790e3b6ec5c6f4ff1031bb7d4b2da0a75ff6b0e08ab8847fd2`。
+- 更新源已配置为 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE)，并已发布 `v1.1.1` Release（APK + SHA256SUMS 资产）。
+- 应用版本同为 `1.1.1`，检查返回 `tag_name=v1.1.1`、发布说明和 APK 资产，界面正确显示「已是最新」而不会误报更新。
+- 从 GitHub 下载的 Release APK SHA-256：`566da617725db7a9f9d1f9f0758449574453700e83ab5dd69a9db962751d6987`。
 - 无 Release / 网络异常路径此前也已验证，分别显示空状态和错误信息，不崩溃。
 - 证据：[`29-update-check.png`](screenshots/29-update-check.png)。
 
@@ -230,10 +230,10 @@ cell_network_type=LTE
 
 - 设置页新增「00 使用指导」卡片，可打开完整 `GuideScreen`；指导覆盖快速开始、真实 GPS、摇杆、路线录制、JDWP 一键包、LSPatch / Xposed 模块、缓存/更新/诊断和边界。
 - 环境页 Frida/LSPatch 区块、运动页录制卡片均提供「使用指导」入口；从指导可直接打开环境页/运动页。
-- 验证 release 1.1.0 安装后，设置 →「阅读完整指导」正常打开，标题显示 `v1.1.0`。
+- 验证 release 1.1.1 安装后，设置 →「阅读完整指导」正常打开，标题显示 `v1.1.1`。
 - 证据：[`30-guide.png`](screenshots/30-guide.png)。
 
-### 2.17 LSPatch 虚拟无线环境（1.2.0-dev）
+### 2.17 LSPatch 虚拟无线环境（1.1.1）
 
 - 模块 1.1.0 新增无线 Hook；配置仍走 `Settings.Global.elsewhere_sensor_config`，新增 `environment` 分组（Wi-Fi / 蓝牙 / cell）。
 - 用 LSPatch v1.2 CLI 将新模块嵌入一个带 Wi-Fi / 蓝牙 / 电话读取的最小目标 APK；配置：
@@ -293,7 +293,7 @@ $env:ANDROID_SDK_ROOT='D:\Android\sdk'
 ```powershell
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 # 或
-adb install dist\elsewhere-1.1.0.apk
+adb install dist\elsewhere-1.1.1.apk
 ```
 
 ---
@@ -310,4 +310,5 @@ adb install dist\elsewhere-1.1.0.apk
 - 应用缓存：`08-apps.png`、`09-app-detail.png`
 - 系统诊断：`07-settings.png`、`07b-settings-diagnostics.png`
 - 更新检查：`29-update-check.png`
+
 
