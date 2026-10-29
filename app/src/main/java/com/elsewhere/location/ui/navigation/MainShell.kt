@@ -37,6 +37,7 @@ import com.elsewhere.location.ui.UiEvent
 import com.elsewhere.location.ui.apps.AppsScreen
 import com.elsewhere.location.ui.components.EIcon
 import com.elsewhere.location.ui.environment.EnvironmentScreen
+import com.elsewhere.location.ui.guide.GuideScreen
 import com.elsewhere.location.ui.map.MapScreen
 import com.elsewhere.location.ui.motion.MotionScreen
 import com.elsewhere.location.ui.settings.SettingsScreen
@@ -63,13 +64,14 @@ enum class TopDestination(
 }
 
 private const val SETTINGS_ROUTE = "settings"
+private const val GUIDE_ROUTE = "guide"
 
 @Composable
 fun MainShell(viewModel: ElsewhereViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val showBottomBar = currentRoute != SETTINGS_ROUTE
+    val showBottomBar = currentRoute != SETTINGS_ROUTE && currentRoute != GUIDE_ROUTE
 
     LaunchedEffect(navController) {
         viewModel.events.collectLatest { event ->
@@ -122,6 +124,7 @@ fun MainShell(viewModel: ElsewhereViewModel) {
                 MotionScreen(
                     viewModel = viewModel,
                     onOpenSettings = { navController.navigate(SETTINGS_ROUTE) },
+                    onOpenGuide = { navController.navigate(GUIDE_ROUTE) },
                     onPlanRoute = {
                         viewModel.beginRouteDraft()
                         navController.navigate(TopDestination.Map.route)
@@ -132,6 +135,7 @@ fun MainShell(viewModel: ElsewhereViewModel) {
                 EnvironmentScreen(
                     viewModel = viewModel,
                     onOpenSettings = { navController.navigate(SETTINGS_ROUTE) },
+                    onOpenGuide = { navController.navigate(GUIDE_ROUTE) },
                 )
             }
             composable(TopDestination.Apps.route) {
@@ -144,6 +148,22 @@ fun MainShell(viewModel: ElsewhereViewModel) {
                 SettingsScreen(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() },
+                    onOpenGuide = { navController.navigate(GUIDE_ROUTE) },
+                )
+            }
+            composable(GUIDE_ROUTE) {
+                GuideScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenEnvironment = {
+                        navController.navigate(TopDestination.Environment.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenMotion = {
+                        navController.navigate(TopDestination.Motion.route) {
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
         }

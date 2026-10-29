@@ -98,6 +98,7 @@ import kotlinx.coroutines.delay
 fun EnvironmentScreen(
     viewModel: ElsewhereViewModel,
     onOpenSettings: () -> Unit,
+    onOpenGuide: () -> Unit,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val session by viewModel.session.collectAsStateWithLifecycle()
@@ -626,6 +627,7 @@ fun EnvironmentScreen(
                     viewModel.generateFridaHook(fridaTargetDraft)
                 },
                 onExportKit = viewModel::exportJdwpKit,
+                onOpenGuide = onOpenGuide,
                 onCopy = copyText,
             )
 
@@ -651,6 +653,7 @@ fun EnvironmentScreen(
                 onCopyAdb = {
                     copyText("ADB Xposed 配置命令", viewModel.xposedAdbCommand())
                 },
+                onOpenGuide = onOpenGuide,
             )
 
             Spacer(Modifier.height(24.dp))
@@ -757,6 +760,7 @@ private fun LSPatchXposedSection(
     onExportModule: () -> Unit,
     onWriteConfig: () -> Unit,
     onCopyAdb: () -> Unit,
+    onOpenGuide: () -> Unit,
 ) {
     Column(Modifier.padding(horizontal = 16.dp)) {
         NoticeBlock(
@@ -848,6 +852,8 @@ private fun LSPatchXposedSection(
             style = MonoTiny.copy(fontSize = 8.sp),
             color = Faint,
         )
+        Spacer(Modifier.height(8.dp))
+        TinyActionChip("模块使用指导", onOpenGuide, icon = EIcon.Info)
     }
 }
 
@@ -862,6 +868,7 @@ private fun FridaSensorBridgeSection(
     onModeSelect: (FridaInjectionMode) -> Unit,
     onGenerate: () -> Unit,
     onExportKit: () -> Unit,
+    onOpenGuide: () -> Unit,
     onCopy: (String, String) -> Unit,
 ) {
     val environment = frida.environment
@@ -1125,6 +1132,8 @@ private fun FridaSensorBridgeSection(
             style = MonoTiny.copy(fontSize = 8.sp),
             color = Faint,
         )
+        Spacer(Modifier.height(8.dp))
+        TinyActionChip("完整使用指导", onOpenGuide, icon = EIcon.Info)
     }
 }
 

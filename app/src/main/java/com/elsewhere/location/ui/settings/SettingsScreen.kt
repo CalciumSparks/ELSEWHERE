@@ -88,6 +88,7 @@ import com.elsewhere.location.ui.theme.SystemSans
 fun SettingsScreen(
     viewModel: ElsewhereViewModel,
     onBack: () -> Unit,
+    onOpenGuide: () -> Unit,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val shizuku by viewModel.shizukuStatus.collectAsStateWithLifecycle()
@@ -133,6 +134,46 @@ fun SettingsScreen(
             )
 
             Spacer(Modifier.height(14.dp))
+            SectionRule(
+                index = "00",
+                title = "使用指导",
+                english = "field manual",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                trailing = {
+                    TinyActionChip("打开", onOpenGuide, icon = EIcon.Info)
+                },
+            )
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(CutCornerShape(topEnd = 18.dp, bottomStart = 18.dp))
+                        .background(Ink)
+                        .padding(14.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("FIELD MANUAL", style = MonoLabel.copy(fontSize = 9.sp), color = Live)
+                        Spacer(Modifier.weight(1f))
+                        Text("内置", style = MonoTiny.copy(fontSize = 7.sp), color = Paper.copy(alpha = 0.35f))
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "从 Shizuku 通道、真实 GPS、悬浮摇杆，到路线录制、Frida JDWP 一键包和 LSPatch / Xposed 模块。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Paper.copy(alpha = 0.62f),
+                    )
+                    Spacer(Modifier.height(9.dp))
+                    TinyActionChip(
+                        "阅读完整指导",
+                        onOpenGuide,
+                        selected = true,
+                        dark = true,
+                        icon = EIcon.Info,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
             SectionRule(
                 index = "01",
                 title = "注入通道",

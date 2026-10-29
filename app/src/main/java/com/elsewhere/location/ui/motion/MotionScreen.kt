@@ -109,6 +109,7 @@ import java.util.Locale
 fun MotionScreen(
     viewModel: ElsewhereViewModel,
     onOpenSettings: () -> Unit,
+    onOpenGuide: () -> Unit,
     onPlanRoute: () -> Unit,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -540,6 +541,7 @@ fun MotionScreen(
                 onStart = viewModel::startRouteRecording,
                 onStop = { viewModel.stopRouteRecording(save = true) },
                 onDiscard = { viewModel.stopRouteRecording(save = false) },
+                onOpenGuide = onOpenGuide,
             )
             Spacer(Modifier.height(8.dp))
             if (settings.routes.isEmpty()) {
@@ -771,6 +773,7 @@ private fun RouteRecorderCard(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onDiscard: () -> Unit,
+    onOpenGuide: () -> Unit,
 ) {
     if (state.recording) {
         Column(
@@ -833,6 +836,8 @@ private fun RouteRecorderCard(
                 Spacer(Modifier.height(7.dp))
                 Text(state.error, style = MonoTiny.copy(fontSize = 8.sp), color = Amber)
             }
+            Spacer(Modifier.height(7.dp))
+            TinyActionChip("录制使用指导", onOpenGuide, icon = EIcon.Info)
         }
     }
 }
