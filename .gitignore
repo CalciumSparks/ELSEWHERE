@@ -32,3 +32,6 @@ dist/*.idsig
 /.archify/
 /.archify-output/
 /archify-elsewhere/
+/docs/architecture/*report.json
+/docs/architecture/*.delivery.json
+

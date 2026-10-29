@@ -1,387 +1,248 @@
 # 他乡 / ELSEWHERE
 
-**一台跑在 Android 上的无 Root 位置仪。** 用 Shizuku 的 shell 通道把坐标交给系统定位栈，用一张地图、一个准星和一只悬浮摇杆，替身去别处。
+> Android 上的无 Root 位置仪。地图、准星、悬浮摇杆、路线，以及一条可选的 Frida 传感器桥。
 
-- 版本：**1.0.0**
-- 包名：`com.elsewhere.location`
-- 平台：Android 8.0+（API 26+），targetSdk 35
-- 形态：单 APK，本地优先，无账号、无遥测、无 Root
-- 仓库：[CalciumSparks/ELSEWHERE](https://github.com/CalciumSparks/ELSEWHERE)
-- 发行版：[v1.0.0](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0)
-- 设计记录：[docs/DESIGN.md](docs/DESIGN.md) · 验证记录：[docs/TESTING.md](docs/TESTING.md)
+[中文](#中文) · [English](#english) · [Releases](https://github.com/CalciumSparks/ELSEWHERE/releases) · [Interactive architecture](docs/architecture/elsewhere-architecture.html)
 
-![他乡地图主界面](docs/screenshots/03-map.png)
+[![他乡系统结构](docs/architecture/elsewhere-architecture.png)](docs/architecture/elsewhere-architecture.html)
+
+> **分支状态 / Branch status**  
+> `main` 在 `v1.0.0` 之后新增了 **路线录制** 与 **Frida Sensor Bridge**；这两项尚未进入新的 GitHub Release。当前公开 APK 仍是 `v1.0.0`，如需使用新功能请从源码构建。  
+> `main` adds **route recording** and the **Frida Sensor Bridge** after `v1.0.0`. The latest public APK is still `v1.0.0`; build from source to try the new work.
 
 ---
 
-## 它做了什么
+## 中文
 
-### 地图与坐标
+### 它是什么
 
-- 全屏地图 + 固定准星：拖图选点，松手即得到准星下的坐标。
-- 高德栅格底图（GCJ-02 显示）与 OpenStreetMap 底图；内部和注入始终使用 WGS-84，转换在显示层完成。
-- 地址搜索、经纬度直接输入、反向地理编码；中文结果优先。
-- 一键开始 / 停止模拟，位置通过 Android 测试定位提供者（GPS / Network / Fused）注入。
+他乡是一台**不需要 Root 的位置仪**：Shizuku 提供 shell 级通道，应用向 Android 的 GPS / Network / Fused 测试定位提供者写入坐标，地图负责选点和路线，前台服务维持输出，悬浮摇杆负责跨应用移动。
 
-### 真实 GPS 对齐
+核心定位链路不需要 Root。**Frida 传感器桥是可选的高级外挂**，它需要 Root + frida-server，或把 Frida Gadget 打进目标 APK；没有外部注入环境时，应用只生成和部署脚本，不会假装已经 Hook 了其他 App。
 
-1. 静止时点右侧「真实」，读取系统当前定位。
-2. 卡片给出坐标、地址、精度和新鲜度；如果是缓存位置，会明确标注「缓存定位 · N 分钟前」。
-3. 确认后点「应用此点」，准星才移动。不会先偷偷把地图跳到真实位置。
+### 核心能力
 
-### 运动与悬浮摇杆
+- 全屏地图、固定准星、拖图选点、地址搜索、经纬度输入。
+- 高德栅格底图（GCJ-02 显示）与 OpenStreetMap；内部与注入始终 WGS-84。
+- 一键开始 / 停止模拟；停止后移除测试提供者，系统定位恢复。
+- 真实 GPS 两阶段确认：先显示坐标、地址、精度与缓存年龄，再手动应用。
+- 走路 / 跑步 / 骑行，速度包络、步态节奏、步数、路线环线与漂移。
+- 系统悬浮摇杆；路线巡航时自动切换为环形进度。
+- 应用内摇杆、路线规划 / 保存 / 重播。
+- **路线录制**：在模拟移动时采样实时轨迹，保存为可巡航 RoutePlan。
+- Wi-Fi / 蓝牙 / 基站 extras、场景预设、应用内传感器推演。
+- 应用扫描、缓存占用、手动系统清理入口、外部缓存快照。
+- **Frida Sensor Bridge**：生成真实 JavaScript Hook，通过目标进程的 `SystemSensorManager` 改写六类传感器事件。
+- Shizuku / Root / Hook 诊断，GitHub Release 更新检查。
 
-- 走路 / 跑步 / 骑行三套速度包络；速度会在目标值附近平滑呼吸，不会瞬间跳变。
-- 应用内摇杆和系统悬浮摇杆都能控制方向；松手后缓慢减速，不突兀停顿。
-- 悬浮面板同时提供模式切换、速度微调、停止和收起。
-- 路线巡航时，悬浮面板自动切换成环形进度视图，不再显示无效的摇杆。
-
-### 模拟路线
-
-- 在地图上连续加航点，实时显示总里程。
-- 步行 / 跑步 / 骑行模式，可保存为路线并重播。
-- 支持环线反复巡航；路线进度、距离和步数都在注入状态里更新。
-- 路线按航点直线巡航。这是模拟器，不是真实道路导航引擎。
-
-### 定位漂移与高级环境参数
-
-- 多正弦平滑漂移，可直接叠加在注入坐标上；可调幅度与速度。
-- 咖啡馆 / 地铁 / 办公室场景预设。
-- Wi-Fi、蓝牙、基站字段随 `Location` 的 `extras` 一起发出，并在界面里预览。
-- **这些无线电字段不会改变系统 Wi-Fi / 蓝牙 / 基站扫描结果**，第三方 App 仍可读取真实无线电信息。
-
-### 运动传感器（应用内）
-
-加速度、陀螺仪、重力、线性加速度、步数、步伐检测六个通道，给应用内的运动推演和回放使用。
-
-- 会随速度、步频、路线坡度产生数值变化。
-- **不会把传感器流注入其他 App。** 无 Root 的 Shizuku 没有系统传感器写入权限，界面中对此有明确标注。
-
-### 应用与缓存
-
-- 扫描带桌面入口的应用；通过 DEX 字符串检测高德 / 百度地图 SDK，作为参考提示。
-- 读取目标应用缓存占用（需要 Usage Access）。
-- 打开系统应用信息页，由用户手动执行「存储和缓存 → 清除缓存」。
-- 可保存目标应用**可访问的外部缓存**快照，并可写回。
-- 不读取、不备份系统私有内部缓存；写回后的文件归属仍受平台限制。详见下文。
-
-### 首次校准与诊断
-
-- 三步首次引导：介绍 → Shizuku 通道 → 权限校准。
-- 自动请求 Shizuku 授权、模拟位置 AppOp、悬浮窗权限。
-- 系统诊断：Shizuku 服务、授权、模拟位置 AppOp、精确位置、悬浮窗、通知、电池优化、系统定位开关、Hook / su 信号、反 Mock 检测状态。
-- 只读 Hook 日志；不依赖 Root / LSPosed，也不能绕过目标应用的 Mock 检测。
-- GitHub Release 更新检查；可配置仓库，不自动下载或安装。
-
----
-
-## 真实 / 模拟边界
+### 真实 / 模拟边界
 
 | 能力 | 实际效果 | 说明 |
 | --- | --- | --- |
-| 系统定位 | **真实注入** | 通过 `test provider` 写入 GPS / Network / Fused；系统会把 Location 标记为 mock。 |
-| 坐标、路线、运动、漂移 | **真实注入** | 全部在 `MockLocationService` 的 tick 里计算并推送。 |
-| 悬浮摇杆 | **真实系统悬浮窗** | `TYPE_APPLICATION_OVERLAY`，跨应用可用。 |
-| 加速度 / 陀螺仪 / 重力 / 步数 | **应用内推演** | 无 Root 无法把传感器流写入系统或其他 App；界面标注 `APP-ONLY`。 |
-| Wi-Fi / 蓝牙 / 基站 | **Location extras** | 仅作为附加字段，不改变扫描结果。界面标注 `APP-SIDE EXTRAS`。 |
-| 清理缓存 | **系统页面手动完成** | Shizuku shell 没有 `INTERNAL_DELETE_CACHE_FILES`；Android 15 上 `pm clear --cache-only` 不可用。 |
-| Hook / Root 状态 | **只检测** | 不注入、不绕过；`LIMITED` 是诚实结论。 |
-
-> 这是测试 / 开发工具，不是反检测产品或云手机。请只在你有权修改位置的设备、应用和测试场景中使用。
-
----
-
-## 安装
+| 系统定位 | **真实注入** | GPS / Network / Fused 测试提供者；Android 会标记为 mock。 |
+| 坐标 / 运动 / 路线 / 漂移 | **真实注入** | 前台服务每 200 ms 推进并在测试提供者中更新。 |
+| 悬浮摇杆 | **真实系统悬浮窗** | `TYPE_APPLICATION_OVERLAY`。 |
+| 路线录制 | **应用内采样** | 采样当前被注入的坐标，保存为普通 RoutePlan。 |
+| 应用内传感器 | **仅应用内推演** | 无 Root 无法把传感器流交给其他 App。 |
+| Frida 传感器 Hook | **真实 Hook 脚本（外部注入）** | 需要 Root frida-server 或 Frida Gadget；只影响目标进程。 |
+| Wi-Fi / 蓝牙 / 基站 | **Location extras** | 不改变系统无线电扫描。 |
+| 清理其他 App 缓存 | **系统页面手动完成** | Shizuku shell 不具备 `INTERNAL_DELETE_CACHE_FILES`。 |
 
 ### 安装
 
-从 [v1.0.0 Release](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0) 下载 `elsewhere-1.0.0.apk` 后：
+稳定发行版是 [`v1.0.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0)。从 Release 下载 APK：
 
-```powershell
-adb install <downloaded>.apk
+```bash
+adb install elsewhere-1.0.0.apk
 ```
 
-发行版 v1.0.0 已发布。从源码构建时安装 `app/build/outputs/apk/debug/app-debug.apk`。首次打开会进入三步校准。
+要试用本分支新增的路线录制 / Frida 功能，请从 `main` 构建：
+
+```bash
+./gradlew :app:assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+首次打开会进入三步校准。
 
 ### 准备 Shizuku（推荐）
 
-1. 从 [Shizuku Releases](https://github.com/RikkaApps/Shizuku/releases) 安装 Shizuku。
-2. 打开 Shizuku，按应用内指引开启无线调试并启动服务。
-3. 回到「他乡 → 首次校准 / 系统与诊断」，点击「打开 Shizuku 启动」。
-4. 在 Shizuku 中授权「他乡」，回到应用会自动刷新。
-5. 点击「授权 / 配置」，应用会通过 shell 完成模拟位置 AppOp、悬浮窗和通道检查。
+1. 安装并启动 [Shizuku](https://github.com/RikkaApps/Shizuku/releases)。
+2. 开启无线调试，按 Shizuku 指引启动服务。
+3. 在「他乡 → 首次校准 / 系统与诊断」点击「打开 Shizuku 启动」。
+4. 授权「他乡」，回到应用自动刷新。
+5. 点击「授权 / 配置」，应用会通过 shell 完成模拟位置 AppOp、悬浮窗与通道检查。
 
-本次验证环境：Shizuku **13.6.0**，服务以 `shell`（UID 2000）身份运行，Android 15。
+没有 Shizuku 时也能使用核心模拟定位：在开发者选项 →「选择模拟位置信息应用」中选择「他乡」，授予精确位置、通知与悬浮窗权限即可。
 
-### 无 Shizuku 的降级路径
+### 使用
 
-系统 mock location 的底层机制是 AppOp，不必须 Shizuku：
+**选点 / 启动**：拖动地图把目标点放到准星下，点「开始模拟」；再点停止。
 
-1. 开发者选项 → **选择模拟位置信息应用** → 选择「他乡」。
-2. 授予精确位置、通知。
-3. 在系统「显示在其他应用上层」中允许「他乡」悬浮窗（可选）。
-4. 直接开始模拟。
+**真实 GPS**：静止时点右侧「真实」，确认卡片内容后点「应用此点」。如果只有系统缓存，会显示「缓存定位 · N 分钟前」，不会伪装成实时 GPS。
 
-没有 Shizuku 时，模拟位置仍可工作；缓存快照、自动化 AppOp 和诊断中的 shell 相关项目会显示为不可用。
+**悬浮摇杆**：启动后自动出现。按住拖动方向，松手滑行减速；可切换走路 / 跑步 / 骑行、微调速度；`×` 收起，红色方块停止。
 
-### 运行时权限
+**路线录制**：
 
-- 精确位置：读取真实 GPS、维持前台定位服务。
-- 通知：前台服务常驻通知（Android 13+ 需要）。
-- 悬浮窗：系统级摇杆。
-- 用量访问：读取目标应用缓存大小（可选）。
-- 电池优化白名单：长时间路线巡航建议加入。
+1. 启动模拟，让坐标开始移动。
+2. 运动页 →「模拟路线」→「开始录制」。
+3. 用摇杆、路线巡航或其他方式持续移动；卡片实时显示时长、距离、点数。
+4. 点「结束并保存」生成「录制 MM-dd HH:mm」，出现在路线列表，可直接巡航或编辑。
+5. 录制采样间隔约 1 秒，忽略距离小于 1.5 m 的点；少于 5 m 不保存。模拟停止时会尝试自动保存足够长的录制。
+
+**Frida Sensor Bridge**：
+
+1. 环境页 →「04 Frida 动态 Hook」，填写目标包名。
+2. 点「生成 Hook 脚本」；应用把脚本写入 `Android/data/com.elsewhere.location/files/frida/`，Shizuku 可用时复制到 `/data/local/tmp`。
+3. 按面板给出的命令，在电脑或 Termux 上运行 Frida：
+
+```bash
+adb pull '<脚本路径>' ./elsewhere-sensor.js
+frida -U -f <目标包名> -l ./elsewhere-sensor.js --no-pause
+```
+
+4. 目标应用必须运行并注册对应传感器；脚本会改写 `SystemSensorManager$SensorEventQueue.dispatchSensorEvent` 收到的 values。
+
+详细环境要求和限制：[`docs/FRIDA_SENSOR_BRIDGE.md`](docs/FRIDA_SENSOR_BRIDGE.md)。
+
+> **Frida 不是无 Root 自动注入。** Shizuku 没有跨进程 ptrace 权限；没有 Root / Gadget 时，应用只能生成和部署脚本。Hook 也无法凭空创建设备没有的传感器事件。
+
+### 缓存与限制
+
+- 缓存清理由系统应用信息页手动完成；Shizuku 无法静默清理其他应用缓存。
+- 应用可保存**可访问的外部缓存**快照；写回的所有者仍是 `shell`，目标应用不保证能读取。内部私有缓存无法备份。
+- 无 Root 不能向第三方注入传感器流，也不能改变系统 Wi-Fi / 蓝牙 / 基站扫描结果。
+- 注入位置会被系统标记为 mock；不绕过反作弊或 Mock 检测。
+- 路线录制采样的是**当前模拟输出**，不是独立的真实 GPS 轨迹记录器。
+- 更新检查只读取公开 GitHub Release，不自动下载安装；本分支尚未发布新 Release。
+
+### 构建与验证
+
+环境：JDK 17/21、Android SDK 35、Gradle Wrapper 8.9。
+
+```bash
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
+- 19 个 JVM 单元测试通过：Geo、ChineseGeo、MotionEngine、RouteRecorder、更新版本比较、设置序列化。
+- `lintDebug` 通过。
+- 已在 Android 15 模拟器（1080×2400）验证三路 mock 注入、悬浮摇杆、路线巡航、路线录制保存，以及 Frida 脚本生成和 `node --check` 语法检查。
+- Frida 运行时注入尚未在真实 Root / Gadget 环境联调。
+
+完整验证记录：[`docs/TESTING.md`](docs/TESTING.md)。
+
+### 架构
+
+[![Archify architecture](docs/architecture/elsewhere-architecture.png)](docs/architecture/elsewhere-architecture.html)
+
+Archify 架构图覆盖主定位链路、路线录制、Shizuku 通道和外部 Frida 注入边界。可打开交互式 HTML，或查看 [`docs/DESIGN.md`](docs/DESIGN.md) 的设计记录。
+
+主要模块：
+
+```text
+Compose UI
+  └─ ElsewhereViewModel
+       ├─ SettingsRepository (DataStore)
+       ├─ RouteRecorder
+       ├─ ShizukuManager ── Shizuku service (shell UID 2000)
+       ├─ Frida Sensor Bridge ── [external Frida client/server] ── Target app
+       └─ MockLocationService
+            └─ MotionEngine
+                 └─ MockLocationProvider ── Android LocationManager
+```
+
+### 许可
+
+应用代码 MIT；字体 OFL；osmdroid / AndroidX / OkHttp / Shizuku 等遵循各自许可；地图、地理编码和 Frida 服务有独立条款。详见 [`LICENSE`](LICENSE) 与 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
 ---
 
-## 使用
+## English
 
-### 选点与启动
+### What it is
 
-1. 拖动地图，把目标点放到准星下。
-2. 底部仪表板显示纬度、经度、反向地址和当前模式。
-3. 点「开始模拟」；状态变为 `MOCKING`，系统定位栈收到 mock 坐标。
-4. 再点即可停止；停止后测试提供者会被移除，系统定位恢复。
+ELSEWHERE is a **root-free Android location instrument**. Shizuku provides a shell-level channel; the app injects coordinates through Android's GPS / Network / Fused test providers. A full-screen map handles point selection and routes; a foreground service keeps the output alive; a system overlay joystick moves the position across apps.
 
-### 真实位置
+The core location path does not require root. The **Frida Sensor Bridge is an optional external workflow** needing either a rooted `frida-server` or a Frida Gadget build of the target. Without an external injection environment the app generates and deploys the script; it never claims to have hooked another app.
 
-静止时点地图右侧「真实」。如果有实时 GPS，卡片显示「实时 GPS · 精度 ±x.x m」；如果只有系统缓存，卡片显示「缓存定位 · N 分钟前」，不会把缓存伪装成实时定位。
+### Features
 
-### 悬浮摇杆
+- Full-screen map, fixed crosshair, drag-to-select, address/coordinate search.
+- AMap raster tiles in GCJ-02 for display; OSM fallback; WGS-84 internally and for injection.
+- One-tap start/stop; test providers are removed on stop.
+- Two-step real GPS confirmation, including explicit cached-fix age.
+- Walk / run / cycle modes, smooth speed envelopes, gait rhythm, steps, route loops, drift.
+- System overlay joystick; automatic ring progress during route cruise.
+- In-app joystick, route planning, save, replay.
+- **Route recording** from the live simulated path into a replayable `RoutePlan`.
+- Wi-Fi / Bluetooth / cell Location extras, presets, in-app sensor telemetry.
+- App scan, cache size, manual system cache cleanup, external cache snapshots.
+- **Frida Sensor Bridge** generating a real JavaScript hook for six Android sensor types.
+- Shizuku / root / hook diagnostics and GitHub Release checks.
 
-启动模拟后，悬浮摇杆自动出现：
+### What is real?
 
-- 按住并拖动：控制方向。
-- 松手：平滑减速。
-- 底座上方切换走路 / 跑步 / 骑行。
-- `+ / -` 微调当前模式的目标速度。
-- 方按钮停止，`×` 收起。
-- 悬浮窗位置可以拖动。
+| Capability | Effect | Notes |
+| --- | --- | --- |
+| System location | **Real injection** | GPS / Network / Fused test providers; Android flags values as mock. |
+| Position / motion / route / drift | **Real injection** | 5 Hz foreground service updates. |
+| Floating joystick | **Real system overlay** | `TYPE_APPLICATION_OVERLAY`. |
+| Route recording | **App-side sampling** | Samples the currently injected point. |
+| In-app sensors | **App-only telemetry** | No root cannot expose sensor streams to other apps. |
+| Frida sensor hook | **Real hook script, external injection** | Root frida-server or Frida Gadget; affects the target process only. |
+| Wi-Fi / Bluetooth / cell | **Location extras** | Does not change radio scans. |
+| Cache clearing | **Manual system page** | Shizuku shell lacks `INTERNAL_DELETE_CACHE_FILES`. |
 
-### 路线
+### Install
 
-1. 地图右侧「路线」进入规划。
-2. 在地图上连续加航点；底部显示总里程。
-3. 可输入路线名、选择模式、开启环线。
-4. 「保存路线」只保存；「保存并巡航」保存并立刻开始。
-5. 已保存路线在「运动 → 模拟路线」中，可再次巡航或编辑。
+The stable binary is [`v1.0.0`](https://github.com/CalciumSparks/ELSEWHERE/releases/tag/v1.0.0). For the new route recorder / Frida work, build `main`:
 
-### 环境参数
-
-- 在「环境」中开启漂移，设置幅度。
-- 选择咖啡馆 / 地铁 / 办公室预设，或逐项编辑 Wi-Fi、蓝牙、基站。
-- 点击「写入 Location extras」后，mock Location 的 extras 中才会带上这些字段。
-- 参数在下一次开始模拟时生效；正在运行时会提示重新开始。
-
-### 应用缓存
-
-1. 进入「应用」，选择目标应用。
-2. 点「手动清理定位缓存」。
-3. 对话框会说明系统限制，并可勾选「先备份外部缓存」。
-4. 点「打开系统清理页」，在系统的应用信息页执行「存储和缓存 → 清除缓存」。
-5. 回到他乡，应用会提示结果并提供最新快照记录。
-
-> 高德 / 百度等 SDK 的定位缓存通常在应用 cache 目录中；系统清理页会一并清掉。无 Root 工具无法提供可验证的静默清理。
-
----
-
-## 能力边界
-
-### 无 Root 不能做的事
-
-- 不能向其他 App 注入传感器流（加速度、陀螺仪、重力、步数等）。
-- 不能改变系统 Wi-Fi / 蓝牙 / 基站的扫描结果。
-- 不能修改其他应用的私有内部缓存，也不能在 Android 15 上以 shell 静默执行 cache-only clear。
-- 不能绕过目标应用的 mock location 检测或反作弊。
-- 不能在未授权的情况下修改系统分区。
-
-### 缓存快照的具体限制
-
-应用把目标应用 `Android/data/<package>/cache` 中**可访问的外部缓存**打包到本应用的外部文件目录，并在写回时尝试用 `chmod a+rwX` 让目标应用可读。
-
-但是：
-
-- 写入者仍是 Shizuku 的 `shell` 身份，文件系统所有者不是目标应用。
-- 目标应用是否读取这些文件，取决于厂商对 `Android/data` 的路径和权限策略。
-- 系统私有内部缓存完全无法备份 / 恢复。
-- 因此界面把动作称为「写回快照」，而不是承诺完整恢复。
-
-### 其他说明
-
-- 更新检查不自动下载 APK；默认读取 [`CalciumSparks/ELSEWHERE`](https://github.com/CalciumSparks/ELSEWHERE) 的公开 Release。v1.0.0 已发布，当前应用版本相同，检查会显示「已是最新」并展示 Release 说明。
-- 高德栅格底图与 Web 地理编码服务有各自的条款；应用不内置任何 API Key。
-- Photon 地理编码、OpenStreetMap 底图、GitHub API 均需要网络。
-- 真实 GPS 在室内可能只能得到缓存定位；界面会明确标出。
-- 已在 1080×2400、Android 15 模拟器上验证；其他厂商系统上的 AppOp 和悬浮窗行为可能不同。
-
----
-
-## 构建
-
-### 环境
-
-- JDK 17 或 21（本机使用 JDK 21）
-- Android SDK 35，Build Tools 35.0.0
-- Gradle Wrapper 8.9
-
-```powershell
-$env:JAVA_HOME='D:\Program Files\Java\jdk-21'
-$env:ANDROID_HOME='D:\Android\sdk'
-$env:ANDROID_SDK_ROOT='D:\Android\sdk'
-
-.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```bash
+./gradlew :app:assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-产物：
+### Shizuku setup
 
-- Debug：`app/build/outputs/apk/debug/app-debug.apk`
-- Release（Gradle）：`app/build/outputs/apk/release/app-release-unsigned.apk`
+Install and start [Shizuku](https://github.com/RikkaApps/Shizuku/releases), authorize ELSEWHERE, then tap **Authorize / Configure**. Without Shizuku, choose **ELSEWHERE** under Developer options → Select mock location app, and grant location, notification and overlay permissions.
 
-### 发行版签名
+### Frida Sensor Bridge
 
-签名密钥位于本地 `release/elsewhere-release.jks`，该目录和所有 `.jks` 已被 `.gitignore` 排除，不随仓库提交。口令与别名请放在密码管理器或本地 `release/README.md`；丢失密钥后无法以更新方式覆盖已安装的发行版。
+The app generates a configuration-specific JavaScript file. With Shizuku it can copy it to `/data/local/tmp`; the actual injection must be performed by an external Frida client:
 
-以下命令中的口令从环境变量读取，不要写进仓库：
-
-```powershell
-$bt = 'D:\Android\sdk\build-tools\35.0.0'
-$env:ELSEWHERE_STORE_PASS = '<your-store-password>'
-$env:ELSEWHERE_KEY_PASS   = '<your-key-password>'
-& "$bt\zipalign.exe" -f -p 4 app\build\outputs\apk\release\app-release-unsigned.apk dist\elsewhere-1.0.0-aligned.apk
-& "$bt\apksigner.bat" sign `
-  --ks release\elsewhere-release.jks `
-  --ks-key-alias elsewhere `
-  --ks-pass "pass:$env:ELSEWHERE_STORE_PASS" `
-  --key-pass "pass:$env:ELSEWHERE_KEY_PASS" `
-  --out dist\elsewhere-1.0.0.apk dist\elsewhere-1.0.0-aligned.apk
-Remove-Item dist\elsewhere-1.0.0-aligned.apk
-& "$bt\apksigner.bat" verify --print-certs dist\elsewhere-1.0.0.apk
+```bash
+adb pull '<script path>' ./elsewhere-sensor.js
+frida -U -f <target.package> -l ./elsewhere-sensor.js --no-pause
 ```
 
-发行签名证书 SHA-256：
+The hook replaces values in `SystemSensorManager$SensorEventQueue.dispatchSensorEvent` for accelerometer, gyroscope, gravity, linear acceleration, step counter and step detector. The target must run and register the sensors; this cannot create hardware events that do not exist.
 
-```
-27780366d4d1a041c0eb99b8b99bfafb9374de4d35af4ed840e422f2598349d0
-```
+Requirements and troubleshooting: [`docs/FRIDA_SENSOR_BRIDGE.md`](docs/FRIDA_SENSOR_BRIDGE.md).
 
-本地 APK 校验和可用 `Get-FileHash dist\elsewhere-1.0.0.apk -Algorithm SHA256` 生成。Debug 与 Release 签名不同，不能互相覆盖安装；切换时先卸载旧版。
+### Route recording
 
-### 更新仓库
+Start a mock session, open **Motion → Route plans → Start recording**, move via the joystick or a saved route, then **Stop and save**. Points closer than 1.5 m are ignored; less than 5 m is not saved. The result is a normal route plan and can be replayed, edited or deleted.
 
-`gradle.properties`：
+### Limits
 
-```properties
-ELSEWHERE_UPDATE_REPO=CalciumSparks/ELSEWHERE
-```
+- No anti-cheat or mock-detection bypass. Injected locations are marked mock.
+- No system-wide sensor or radio injection without root/system privileges.
+- Other apps' private caches cannot be cleared or backed up silently; external snapshots may not be readable by the target after write-back.
+- Frida injection is external. Shizuku cannot ptrace another UID and cannot automatically attach Frida.
+- The route recorder captures the simulated output, not an independent real-GPS track.
+- The public v1.0.0 APK predates the two additions on `main`.
 
-也可以在应用「系统与诊断 → GitHub 更新」中编辑仓库地址，点「检查 GitHub Release」后会保存。版本比较读取公开 Release 的 `tag_name`；无 Release 时给出空状态。应用只展示版本、更新说明和下载入口，不自动下载安装。当前 `v1.0.0` 已发布，应用版本相同，因此会显示「已是最新」；发布更高版本后会显示新版本卡片和下载入口。
+### Build and verification
 
----
-
-## 架构
-
-```
-app/src/main/java/com/elsewhere/location/
-├── MainActivity.kt               # 入口、权限 launcher、系统 Intent 事件
-├── ElsewhereApplication.kt
-├── AppContainer.kt
-├── core/
-│   ├── Geo.kt                   # haversine、方位角、距离格式化
-│   ├── ChineseGeo.kt            # WGS-84 ↔ GCJ-02
-│   └── Models.kt                # 设置、路线、环境、传感器、会话状态
-├── location/
-│   ├── MotionEngine.kt          # 纯 Kotlin 运动/路线/步态引擎
-│   ├── DriftGenerator.kt        # 多正弦漂移
-│   ├── MockLocationProvider.kt  # 测试定位提供者安装与推送
-│   └── RealLocationProbe.kt     # 当前真实位置 / 缓存新鲜度
-├── service/
-│   └── MockLocationService.kt   # 前台服务、tick、通知、悬浮窗生命周期
-├── overlay/
-│   └── OverlayJoystickController.kt
-├── shizuku/
-│   └── ShizukuManager.kt        # 授权、AppOp、受控 shell、诊断
-├── data/
-│   ├── SettingsRepository.kt    # DataStore + JSON
-│   ├── GeocodingRepository.kt   # Photon / 可选高德 Web 服务
-│   ├── UpdateRepository.kt      # GitHub Release 检查
-│   ├── TargetAppRepository.kt   # 应用扫描、图标、SDK 扫描、缓存大小
-│   ├── CacheBackupRepository.kt # 外部缓存 tar 快照 / 写回
-│   └── DiagnosticsRepository.kt
-└── ui/
-    ├── ElsewhereViewModel.kt    # 单一中央状态
-    ├── map/                     # 地图、准星、真实位置、路线编辑
-    ├── motion/                  # 速度、节奏、摇杆、路线、传感器
-    ├── environment/             # 漂移、预设、无线电
-    ├── apps/                    # 应用列表、缓存工作流
-    ├── settings/                # Shizuku、诊断、地图、更新、关于
-    └── onboarding/
+```bash
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-核心状态流：
+19 JVM tests pass, Android Lint passes, and the Android 15 emulator QA covers mock injection, overlay joystick, route cruise, route recording, Frida script generation and JavaScript syntax. Actual Frida runtime injection has not yet been exercised against a rooted target.
 
-```
-UI → ElsewhereViewModel → MockLocationService（Intent 命令）
-                              ├─ MotionEngine → Location
-                              ├─ MockLocationProvider → 系统定位栈
-                              └─ MockSessionState → Compose / 悬浮窗
-```
+See [`docs/TESTING.md`](docs/TESTING.md) and the interactive architecture at [`docs/architecture/elsewhere-architecture.html`](docs/architecture/elsewhere-architecture.html).
 
-- WGS-84 是内部唯一坐标；GCJ-02 只在 AMap 显示和落点转换时出现。
-- 运动引擎不依赖 Android，可做 JVM 单测。
-- 悬浮摇杆用独立 ComposeView + 自定义 Lifecycle / SavedStateOwner 运行在系统 overlay 窗口。
-- 前台服务使用 `location` 类型，持有运行期 wakelock，停止时移除测试提供者。
+### License
 
----
-
-## 验证
-
-已完成：
-
-- `:app:testDebugUnitTest`：16 个 JVM 单测通过（Geo、ChineseGeo、MotionEngine、路线环线、更新版本比较、设置序列化）。
-- `:app:lintDebug`：通过（保留少量非阻塞警告）。
-- 1080×2400 / Android 15 模拟器：Shizuku 13.6.0，授权、AppOp、前台服务、悬浮摇杆、两条路线、真实 GPS 缓存标注、缓存快照写回、GitHub Release 检查均已手工验证。
-- `dumpsys location` 可见 GPS / Network / Fused 三路 mock 位置，extras 携带 Wi-Fi / 蓝牙 / 基站字段。
-- 停止后前台服务消失，测试提供者 override 被移除。
-
-详细结果见 [`docs/TESTING.md`](docs/TESTING.md)。
-
----
-
-## 截图
-
-| | |
-| --- | --- |
-| ![首次校准](docs/screenshots/00-onboarding.png) | ![Shizuku 通道](docs/screenshots/01-onboarding-shizuku.png) |
-| ![地图](docs/screenshots/03-map.png) | ![真实 GPS](docs/screenshots/17-real-gps.png) |
-| ![悬浮摇杆与路线巡航](docs/screenshots/26-route-overlay.png) | ![运动](docs/screenshots/13-motion.png) |
-| ![环境参数](docs/screenshots/21-environment.png) | ![应用缓存](docs/screenshots/09-app-detail.png) |
-| ![系统诊断](docs/screenshots/07-settings.png) | ![GitHub 更新](docs/screenshots/29-update-check.png) |
-
-更多截图在 [`docs/screenshots`](docs/screenshots)。
-
----
-
-## 第三方与许可
-
-应用代码以 **MIT** 发布，见 [`LICENSE`](LICENSE)。
-
-内置字体：
-
-- Space Grotesk — SIL Open Font License 1.1
-- JetBrains Mono — SIL Open Font License 1.1
-
-主要依赖：
-
-- [osmdroid](https://github.com/osmdroid/osmdroid) — Apache-2.0
-- [Shizuku](https://github.com/RikkaApps/Shizuku) — Apache-2.0（未打包，仅客户端 API）
-- [OpenStreetMap](https://www.openstreetmap.org/) 数据 — ODbL
-- 高德地图栅格瓦片 / Web 地理编码 — 遵循高德服务条款；项目不内置 Key
-- [Photon](https://photon.komoot.io/) — 公共地理编码服务
-- [OkHttp](https://square.github.io/okhttp/) — Apache-2.0
-- AndroidX / Jetpack Compose — Apache-2.0
-
-第三方声明详见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
-
----
-
-**免责声明**：本项目用于位置功能开发、自动化测试和演示。请遵守设备、目标应用及所在地区的法律与服务条款。作者不对用于欺诈、规避风控或未经授权的用途负责。
+MIT for the app code; fonts under OFL; third-party libraries and map/geocoding/Frida services retain their own terms. See [`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

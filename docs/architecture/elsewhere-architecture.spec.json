@@ -1,0 +1,473 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "他乡 / ELSEWHERE · 系统结构",
+    "locale": "zh-CN",
+    "output": "docs/architecture/elsewhere-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:CalciumSparks/ELSEWHERE.git",
+      "link_mode": "local-only",
+      "revision": "ff70aa9770ec7e9a4df93f95a602d0cc386ea78f"
+    }
+  },
+  "components": [
+    {
+      "id": "operator",
+      "type": "external",
+      "label": "User",
+      "sublabel": "map · joystick",
+      "pos": [
+        20,
+        150
+      ],
+      "size": [
+        80,
+        60
+      ]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "Compose UI",
+      "sublabel": "Map · Motion · Overlay",
+      "pos": [
+        180,
+        150
+      ],
+      "size": [
+        130,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/ui/navigation/MainShell.kt",
+          "line": 68
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/ui/map/MapScreen.kt",
+          "line": 156
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/overlay/OverlayJoystickController.kt",
+          "line": 74
+        }
+      ]
+    },
+    {
+      "id": "viewmodel",
+      "type": "backend",
+      "label": "ElsewhereViewModel",
+      "sublabel": "Compose state · intents",
+      "pos": [
+        390,
+        150
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/ui/ElsewhereViewModel.kt",
+          "line": 54
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/ui/ElsewhereViewModel.kt",
+          "line": 645
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/ui/ElsewhereViewModel.kt",
+          "line": 902
+        }
+      ]
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "Mock Location Service",
+      "sublabel": "FGS · 5 Hz tick",
+      "tag": "MotionEngine",
+      "pos": [
+        620,
+        150
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/service/MockLocationService.kt",
+          "line": 44
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/service/MockLocationService.kt",
+          "line": 81
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/service/MockLocationService.kt",
+          "line": 215
+        }
+      ]
+    },
+    {
+      "id": "provider",
+      "type": "backend",
+      "label": "MockLocationProvider",
+      "sublabel": "test providers",
+      "pos": [
+        850,
+        150
+      ],
+      "size": [
+        130,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/location/MockLocationProvider.kt",
+          "line": 29
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/location/MockLocationProvider.kt",
+          "line": 64
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/location/MockLocationProvider.kt",
+          "line": 126
+        }
+      ]
+    },
+    {
+      "id": "system_location",
+      "type": "external",
+      "label": "Android LocationManager",
+      "sublabel": "GPS · Network · Fused",
+      "pos": [
+        1040,
+        150
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "settings",
+      "type": "database",
+      "label": "SettingsRepository",
+      "sublabel": "DataStore · JSON",
+      "pos": [
+        180,
+        330
+      ],
+      "size": [
+        130,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/data/SettingsRepository.kt",
+          "line": 19
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/data/SettingsRepository.kt",
+          "line": 40
+        }
+      ]
+    },
+    {
+      "id": "route_recorder",
+      "type": "backend",
+      "label": "RouteRecorder",
+      "sublabel": "1 Hz · 1.5 m gate",
+      "tag": "core",
+      "pos": [
+        390,
+        330
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/core/RouteRecorder.kt",
+          "line": 9
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/core/RouteRecorder.kt",
+          "line": 21
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/core/RouteRecorder.kt",
+          "line": 47
+        }
+      ]
+    },
+    {
+      "id": "shizuku_manager",
+      "type": "security",
+      "label": "ShizukuManager",
+      "sublabel": "AppOps · shell",
+      "pos": [
+        620,
+        330
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/shizuku/ShizukuManager.kt",
+          "line": 51
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/shizuku/ShizukuManager.kt",
+          "line": 157
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/shizuku/ShizukuManager.kt",
+          "line": 224
+        }
+      ]
+    },
+    {
+      "id": "frida_bridge",
+      "type": "backend",
+      "label": "Frida Sensor Bridge",
+      "sublabel": "script generator",
+      "tag": "external",
+      "pos": [
+        835,
+        330
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "app/src/main/java/com/elsewhere/location/data/FridaSensorRepository.kt",
+          "line": 39
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/data/FridaSensorRepository.kt",
+          "line": 45
+        },
+        {
+          "path": "app/src/main/java/com/elsewhere/location/data/FridaSensorRepository.kt",
+          "line": 84
+        }
+      ]
+    },
+    {
+      "id": "shizuku_server",
+      "type": "external",
+      "label": "Shizuku service",
+      "sublabel": "shell UID 2000",
+      "pos": [
+        180,
+        520
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "frida_client",
+      "type": "external",
+      "label": "Frida client",
+      "sublabel": "PC · Termux",
+      "pos": [
+        835,
+        520
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "frida_server",
+      "type": "external",
+      "label": "frida-server",
+      "sublabel": "root · ptrace",
+      "pos": [
+        835,
+        650
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "target_app",
+      "type": "external",
+      "label": "Target app",
+      "sublabel": "SystemSensorManager",
+      "pos": [
+        1070,
+        650
+      ],
+      "size": [
+        150,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "ELSEWHERE APP · NO ROOT CORE",
+      "wraps": [
+        "ui",
+        "viewmodel",
+        "service",
+        "provider",
+        "settings",
+        "route_recorder",
+        "shizuku_manager",
+        "frida_bridge"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "EXTERNAL FRIDA ENV · ROOT / GADGET",
+      "wraps": [
+        "frida_client",
+        "frida_server",
+        "target_app"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-to-ui",
+      "from": "operator",
+      "to": "ui",
+      "label": "actions",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ui-to-viewmodel",
+      "from": "ui",
+      "to": "viewmodel",
+      "label": "intents"
+    },
+    {
+      "id": "viewmodel-to-service",
+      "from": "viewmodel",
+      "to": "service",
+      "label": "control"
+    },
+    {
+      "id": "service-to-provider",
+      "from": "service",
+      "to": "provider",
+      "label": "mock fix"
+    },
+    {
+      "id": "provider-to-location",
+      "from": "provider",
+      "to": "system_location",
+      "label": "inject"
+    },
+    {
+      "id": "viewmodel-to-settings",
+      "from": "viewmodel",
+      "to": "settings",
+      "label": "state"
+    },
+    {
+      "id": "viewmodel-to-recorder",
+      "from": "viewmodel",
+      "to": "route_recorder",
+      "label": "sample"
+    },
+    {
+      "id": "viewmodel-to-shizuku",
+      "from": "viewmodel",
+      "to": "shizuku_manager",
+      "label": "AppOps"
+    },
+    {
+      "id": "viewmodel-to-frida",
+      "from": "viewmodel",
+      "to": "frida_bridge",
+      "label": "generate"
+    },
+    {
+      "id": "frida-deploys-via-shizuku",
+      "from": "frida_bridge",
+      "to": "shizuku_manager",
+      "label": "deploy"
+    },
+    {
+      "id": "shizuku-to-server",
+      "from": "shizuku_manager",
+      "to": "shizuku_server",
+      "label": "binder"
+    },
+    {
+      "id": "frida-to-client",
+      "from": "frida_bridge",
+      "to": "frida_client",
+      "label": "JS file"
+    },
+    {
+      "id": "client-to-server",
+      "from": "frida_client",
+      "to": "frida_server",
+      "label": "attach"
+    },
+    {
+      "id": "server-to-target",
+      "from": "frida_server",
+      "to": "target_app",
+      "label": "inject",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Core location path",
+      "items": [
+        "The foreground service starts GPS / Network / Fused test providers.",
+        "MotionEngine advances coordinates and the service pushes each fix.",
+        "Standing down removes the test providers and restores the platform."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Route capture",
+      "items": [
+        "RouteRecorder samples the live injected point while a session runs.",
+        "It filters points closer than 1.5 m and saves a replayable RoutePlan."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Frida sensor bridge",
+      "items": [
+        "The app generates the JavaScript and can copy it to /data/local/tmp.",
+        "A root frida-server or Frida Gadget must inject it into the target process.",
+        "Shizuku can deploy files and grant AppOps; it cannot ptrace another app."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Outside this slice",
+      "items": [
+        "AMap / OSM tiles, Photon geocoding and GitHub Release checks use HTTPS.",
+        "App scan, cache snapshot and real-GPS probe are secondary feature branches."
+      ]
+    }
+  ]
+}

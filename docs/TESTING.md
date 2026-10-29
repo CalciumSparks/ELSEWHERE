@@ -20,12 +20,13 @@ $env:ANDROID_HOME='D:\Android\sdk'
 .\gradlew.bat :app:testDebugUnitTest --no-daemon
 ```
 
-结果：**16 / 16 通过**。
+结果：**19 / 19 通过**。
 
 覆盖：
 
 - `GeoTest`：haversine、方位角、最短角度收敛、距离格式化、WGS-84 → GCJ-02 往返、境外坐标不变。
 - `MotionEngineTest`：手动摇杆加速、松手滑行停止、路线到点完成、环线回程、快速骑行到点、漂移偏移边界、模式切换。
+- `RouteRecorderTest`：最小点距过滤、累计距离、时长、短录制拒绝、重新开始清空。
 - `UpdateRepositoryTest`：不同段数、`v` 前缀、`-dev` 后缀的版本比较。
 - `SettingsSerializationTest`：路线 / 坐标 / 模式往返、缺省字段默认值。
 
@@ -170,6 +171,28 @@ cell_network_type=LTE
 - 无 Release / 网络异常路径此前也已验证，分别显示空状态和错误信息，不崩溃。
 - 证据：[`29-update-check.png`](screenshots/29-update-check.png)。
 
+### 2.12 路线录制
+
+- 在模拟会话运行时进入「运动 → 模拟路线」，点「开始录制」。
+- 使用悬浮摇杆持续移动 23 m；录制卡片实时显示时长、距离、采样点。
+- 点「结束并保存」后生成「录制 10-29 05:03」，路线列表显示 `10 航点 · 23 m`，并出现保存通知。
+- 路线沿用现有 RoutePlan，可直接巡航/编辑/删除。
+- 证据（QA 截图存放于本轮临时目录，不随仓库提交）：录制中 `qa-recorder-moving2`、保存后 `qa-recorder-saved`。
+
+### 2.13 Frida Sensor Bridge
+
+- 环境页提供目标包名、Shizuku / su / frida-server 检测、当前模式/通道展示。
+- 输入 `com.android.chrome` 生成脚本；文件可被 `adb pull` 读取，大小 9,276 B，配置中的 target/mode/sensors 正确，`node --check` 通过。
+- 应用在没有 Shizuku 时正确显示「脚本只保存在应用外部目录」，没有伪报注入成功。
+- **未执行真实 Frida 运行时注入**：QA 环境没有安装 host Frida 客户端和对应 frida-server；脚本的 dispatch 行为需在 Root / Gadget 环境验证。这是本功能的主要残余风险。
+- 实现与操作说明见 [`FRIDA_SENSOR_BRIDGE.md`](FRIDA_SENSOR_BRIDGE.md)。
+
+### 2.14 Archify 架构图
+
+- 使用 Archify 3.2.0 生成架构图，源 revision 固化为 `ff70aa9770ec7e9a4df93f95a602d0cc386ea78f`。
+- 最终 `finalize`：validate / deliver / check / browser-check 全部通过，无诊断。
+- 输出：[`architecture/elsewhere-architecture.html`](architecture/elsewhere-architecture.html) 和嵌入 README 的 PNG。
+
 ---
 
 ## 3. 未验证 / 残余风险
@@ -182,6 +205,9 @@ cell_network_type=LTE
 - AMap 瓦片、Photon 地理编码、GitHub API 都依赖第三方网络与条款。
 - 快速连续添加航点时，自动缩放动画会延迟后续点击的落点；属于已知交互问题。
 - 8sp 微标签在小屏/强光下的可读性需要进一步真机评估。
+- Frida Hook 的 Java 层 dispatch 行为尚未在真实 Root / Gadget 环境中联调；厂商字段差异可能让 handle 映射失效。
+- Frida 注入是外部工作流，应用本身不能在无 Root 情况下 attach 第三方进程；这是平台边界，不是 UI 缺陷。
+- 录制路线依赖模拟会话存活；进程被系统杀死时，尚未结束的录制会丢失。
 
 ---
 
